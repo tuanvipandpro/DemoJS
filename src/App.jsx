@@ -1,20 +1,52 @@
 import React, { useState } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ErrorProvider, useError } from './contexts/ErrorContext';
+import ErrorDialog from './components/ErrorDialog';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import ProjectsNew from './pages/ProjectsNew';
 import ProjectDetail from './pages/ProjectDetail';
+import Profile from './pages/Profile';
 import './App.css';
+import { useEffect } from 'react';
+import { checkOAuthReturn } from './services/auth/oauth';
+import { useTheme } from './contexts/ThemeContext';
 
-function App() {
+function AppInner() {
+  const { isAuthenticated, user, loading } = useAuth();
+  const { setError } = useError();
+  const { theme, toggleTheme } = useTheme();
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [showCreateProject, setShowCreateProject] = useState(false);
 
   const handleNavigate = (page) => {
     setCurrentPage(page);
   };
+
+    // No need to check OAuth return on mount with popup approach
+  // OAuth is now handled via popup windows
+
+  // Listen for GitHub repos loaded event
+  useEffect(() => {
+    const handleGitHubReposLoaded = (event) => {
+      console.log('GitHub repos loaded event received:', event.detail);
+      // Navigate to projects page and open create project modal
+      setCurrentPage('projects');
+      // Open modal after a short delay to ensure navigation is complete
+      setTimeout(() => {
+        setShowCreateProject(true);
+        console.log('App: Modal opened after OAuth completion');
+      }, 200);
+    };
+
+    window.addEventListener('github:repos-loaded', handleGitHubReposLoaded);
+    return () => {
+      window.removeEventListener('github:repos-loaded', handleGitHubReposLoaded);
+    };
+  }, []);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -24,21 +56,32 @@ function App() {
         return <ProjectsNew onNavigate={handleNavigate} />;
       case 'project-detail':
         return <ProjectDetail />;
+      case 'profile':
+        return <Profile />;
       default:
         return <Dashboard />;
     }
   };
 
   return (
-    <AuthProvider>
-      <ThemeProvider>
-        <ProtectedRoute>
-          <Layout onNavigate={handleNavigate}>
-            {renderPage()}
-          </Layout>
-        </ProtectedRoute>
-      </ThemeProvider>
-    </AuthProvider>
+    <ProtectedRoute>
+      <Layout onNavigate={handleNavigate}>
+        {renderPage()}
+      </Layout>
+    </ProtectedRoute>
+  );
+}
+
+function App() {
+  return (
+    <ErrorProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <ErrorDialog />
+          <AppInner />
+        </ThemeProvider>
+      </AuthProvider>
+    </ErrorProvider>
   );
 }
 

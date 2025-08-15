@@ -20,6 +20,11 @@ import { useAuth } from '../contexts/AuthContext';
 const Header = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const { user, logout } = useAuth();
+  const navigateToProfile = () => {
+    // Fire a custom event to request navigation to profile page
+    window.dispatchEvent(new CustomEvent('app:navigate', { detail: { page: 'profile' } }));
+    handleClose();
+  };
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -63,7 +68,7 @@ const Header = () => {
             color="inherit"
           >
             <Avatar sx={{ width: 32, height: 32 }}>
-              <AccountCircle />
+              {user?.displayName?.[0] || user?.username?.[0] || <AccountCircle />}
             </Avatar>
           </IconButton>
           <Menu
@@ -83,7 +88,7 @@ const Header = () => {
           >
             <MenuItem onClick={handleClose}>
               <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                {user?.name || 'User'}
+                {user?.displayName || user?.username || 'User'}
               </Typography>
             </MenuItem>
             <MenuItem onClick={handleClose}>
@@ -91,8 +96,7 @@ const Header = () => {
                 {user?.email || 'user@example.com'}
               </Typography>
             </MenuItem>
-            <MenuItem onClick={handleClose}>Profile</MenuItem>
-            <MenuItem onClick={handleClose}>My account</MenuItem>
+            <MenuItem onClick={navigateToProfile}>Profile</MenuItem>
             <MenuItem onClick={handleLogout}>
               <LogoutIcon sx={{ mr: 1 }} />
               Logout

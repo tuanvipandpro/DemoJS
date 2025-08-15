@@ -6,6 +6,15 @@ import Header from './Header';
 const Layout = ({ children, onNavigate }) => {
   const drawerWidth = 240;
 
+  React.useEffect(() => {
+    function onAppNavigate(e) {
+      const page = e.detail?.page;
+      if (page) onNavigate?.(page);
+    }
+    window.addEventListener('app:navigate', onAppNavigate);
+    return () => window.removeEventListener('app:navigate', onAppNavigate);
+  }, [onNavigate]);
+
   return (
     <Box sx={{ display: 'flex' }}>
       <Sidebar onNavigate={onNavigate} />

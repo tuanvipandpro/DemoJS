@@ -110,9 +110,9 @@ const Login = () => {
               required
               fullWidth
               id="username"
-              label="Username"
+              label="Username or Email"
               name="username"
-              autoComplete="username"
+              autoComplete="username email"
               autoFocus
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -178,14 +178,7 @@ const Login = () => {
             Sign in with Google
           </Button>
 
-          <Box sx={{ textAlign: 'center', mt: 3 }}>
-            <Typography variant="body2" color="textSecondary">
-              Demo Credentials:
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Username: admin | Password: admin
-            </Typography>
-          </Box>
+          {/* Demo credentials removed */}
         </Paper>
       </Box>
     </Container>

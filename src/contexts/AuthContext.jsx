@@ -1,4 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { api, bindApiErrorHandler } from '../services/auth/apiClient';
+import { useError } from './ErrorContext';
+import { getAccessToken, setAccessToken, setRefreshToken, clearAllAuthLike } from '../services/auth/tokenStorage';
 
 const AuthContext = createContext();
 
@@ -11,50 +14,64 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    const savedAuth = localStorage.getItem('isAuthenticated');
-    return savedAuth === 'true';
-  });
-
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  const { showError } = useError();
+  const [isAuthenticated, setIsAuthenticated] = useState(!!getAccessToken());
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('isAuthenticated', isAuthenticated);
-    if (user) {
-      localStorage.setItem('user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('user');
-    }
-  }, [isAuthenticated, user]);
+    bindApiErrorHandler(showError);
+    const token = getAccessToken();
+    if (!token) return;
+    (async () => {
+      try {
+        const res = await api.get('/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user || null);
+          setIsAuthenticated(!!data.user);
+        } else {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      } catch (_e) {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    })();
+  }, []);
 
-  const login = (username, password) => {
-    // Tạm thời hardcode credentials
-    if (username === 'admin' && password === 'admin') {
-      const userData = {
-        id: 1,
-        username: 'admin',
-        name: 'Administrator',
-        email: 'admin@insighttestai.com',
-        role: 'admin'
-      };
-      setUser(userData);
+  const login = async (username, password) => {
+    try {
+      setLoading(true);
+      const res = await api.post('/auth/login', { provider: 'local', username, password });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        return { success: false, error: data.error || 'Login failed' };
+      }
+      const tokens = await res.json();
+      if (tokens.access_token) setAccessToken(tokens.access_token);
+      if (tokens.refresh_token) setRefreshToken(tokens.refresh_token);
       setIsAuthenticated(true);
+      const meRes = await api.get('/auth/me');
+      if (meRes.ok) {
+        const me = await meRes.json();
+        setUser(me.user || null);
+      }
       return { success: true };
-    } else {
-      return { success: false, error: 'Invalid username or password' };
+    } catch (err) {
+      return { success: false, error: 'Login error' };
+    } finally {
+      setLoading(false);
     }
   };
 
-  const loginWithGoogle = () => {
-    // TODO: Implement Google OAuth
-    console.log('Google login not implemented yet');
+  const loginWithGoogle = async () => {
     return { success: false, error: 'Google login is not available yet' };
   };
 
   const logout = () => {
+    clearAllAuthLike();
     setUser(null);
     setIsAuthenticated(false);
   };
@@ -62,6 +79,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     isAuthenticated,
     user,
+    loading,
     login,
     loginWithGoogle,
     logout,

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -33,67 +33,13 @@ import {
 } from '@mui/icons-material';
 import CreateProjectStepperModal from '../components/CreateProjectStepperModal';
 import TestReportModal from '../components/TestReportModal';
- import ProjectDetailModal from '../components/ProjectDetailModal';
+import ProjectDetailModal from '../components/ProjectDetailModal';
+import { api } from '../services/auth/apiClient';
 
 const ProjectsNew = ({ onNavigate }) => {
-  const [projects, setProjects] = useState([
-    {
-      id: 1,
-      name: 'Website Redesign',
-      description: 'Complete redesign of the company website with modern UI/UX',
-      status: 'In Progress',
-      progress: 75,
-      startDate: '2024-01-15',
-      endDate: '2024-03-15',
-      team: 'Frontend Team',
-      priority: 'High',
-      budget: '$25,000',
-      coverage: 82,
-      lastRun: 'Passed',
-    },
-    {
-      id: 2,
-      name: 'Mobile App Development',
-      description: 'Development of a new mobile application for iOS and Android',
-      status: 'Planning',
-      progress: 25,
-      startDate: '2024-02-01',
-      endDate: '2024-05-01',
-      team: 'Mobile Team',
-      priority: 'Medium',
-      budget: '$50,000',
-      coverage: 45,
-      lastRun: 'Not run',
-    },
-    {
-      id: 3,
-      name: 'Database Migration',
-      description: 'Migrate existing database to new cloud infrastructure',
-      status: 'Completed',
-      progress: 100,
-      startDate: '2024-01-01',
-      endDate: '2024-01-31',
-      team: 'Backend Team',
-      priority: 'High',
-      budget: '$15,000',
-      coverage: 88,
-      lastRun: 'Passed',
-    },
-    {
-      id: 4,
-      name: 'API Integration',
-      description: 'Integrate third-party APIs for payment processing',
-      status: 'In Progress',
-      progress: 60,
-      startDate: '2024-01-20',
-      endDate: '2024-02-20',
-      team: 'Integration Team',
-      priority: 'Medium',
-      budget: '$30,000',
-      coverage: 73,
-      lastRun: 'Failed',
-    },
-  ]);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -102,6 +48,13 @@ const ProjectsNew = ({ onNavigate }) => {
   });
 
   const [openModal, setOpenModal] = useState(false);
+  useEffect(() => {
+    function onOpenCreateProject() {
+      setOpenModal(true);
+    }
+    window.addEventListener('app:openCreateProject', onOpenCreateProject);
+    return () => window.removeEventListener('app:openCreateProject', onOpenCreateProject);
+  }, []);
   const [reportModal, setReportModal] = useState({ open: false, report: null, projectName: '' });
   const [detailModal, setDetailModal] = useState({ open: false, project: null });
   const [snackbar, setSnackbar] = useState({
@@ -109,6 +62,36 @@ const ProjectsNew = ({ onNavigate }) => {
     message: '',
     severity: 'success',
   });
+
+  // Load projects from server
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await api.get('/github/projects');
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to load projects');
+      }
+      
+      const projectsData = await response.json();
+      setProjects(projectsData);
+      
+    } catch (err) {
+      console.error('Failed to load projects:', err);
+      setError(err.message);
+      // Fallback to empty array
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -139,74 +122,67 @@ const ProjectsNew = ({ onNavigate }) => {
     }
   };
 
-  const handleCreateProject = (projectData) => {
-    const newProject = {
-      ...projectData,
-      // Add default values for missing fields
-      status: 'Planning',
-      priority: 'Medium',
-      progress: 0,
-      team: 'Default Team',
-      budget: '$0',
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-             // Add additional fields from stepper modal
-       gitProvider: projectData.gitProvider || '',
-       repository: projectData.selectedRepository || '',
-       branch: projectData.branch || '',
-       notifications: projectData.selectedNotifications || [],
-       coverage: 0,
-       lastRun: 'Running',
-    };
-    
-    setProjects([newProject, ...projects]);
-    // Simulate auto scan after connect
-    setTimeout(() => simulateAutoScanForProject(newProject.id), 800);
-    setSnackbar({
-      open: true,
-      message: `Project "${newProject.name}" created successfully with ${newProject.notifications.length} notification channels!`,
-      severity: 'success',
-    });
+  const handleCreateProject = async (projectData) => {
+    try {
+      const response = await api.post('/github/projects', {
+        name: projectData.name,
+        description: projectData.description,
+        startDate: projectData.startDate,
+        endDate: projectData.endDate,
+        team: projectData.team || 'Default Team',
+        priority: projectData.priority || 'Medium',
+        budget: projectData.budget || '$0',
+        gitProvider: projectData.gitProvider || '',
+        repository: projectData.repository || projectData.selectedRepository || '',
+        branch: projectData.branch || '',
+        notifications: projectData.selectedNotifications || []
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create project');
+      }
+
+      const result = await response.json();
+      const newProject = result.project;
+      
+      setProjects([newProject, ...projects]);
+      setSnackbar({
+        open: true,
+        message: `Project "${newProject.name}" created successfully!`,
+        severity: 'success',
+      });
+      
+      // Reload projects to get fresh data
+      loadProjects();
+      
+    } catch (err) {
+      console.error('Failed to create project:', err);
+      setSnackbar({
+        open: true,
+        message: `Failed to create project: ${err.message}`,
+        severity: 'error',
+      });
+    }
   };
 
-  const handleDeleteProject = (projectId) => {
-    setProjects(projects.filter(project => project.id !== projectId));
-    setSnackbar({
-      open: true,
-      message: 'Project deleted successfully!',
-      severity: 'success',
-    });
-  };
-
-  const simulateAutoScanForProject = (projectId) => {
-    setProjects(prev =>
-      prev.map(p => (p.id === projectId ? { ...p, lastRun: 'Running' } : p))
-    );
-    setTimeout(() => {
-      setProjects(prev =>
-        prev.map(p => {
-          if (p.id !== projectId) return p;
-          const passed = Math.random() > 0.2;
-          const newCoverage = Math.min(100, Math.max(0, (p.coverage || 0) + (passed ? 1 : -1)));
-          const mockReport = {
-            status: passed ? 'Passed' : 'Failed',
-            total: 42,
-            passed: passed ? 41 : 37,
-            failed: passed ? 1 : 5,
-            duration: '2m 08s',
-            coverageBefore: p.coverage || 0,
-            coverageAfter: newCoverage,
-            failedTests: passed ? [] : [
-              { name: 'should create project from GitHub repo', error: 'Timeout: element not found' },
-              { name: 'detects code changes and triggers run', error: 'Expected 1 run, got 0' },
-            ],
-            logs: `[AUTO] Webhook received for ${p.name} (id=${p.id})\n[INFO] Checkout ${p.repository || p.selectedRepository || 'N/A'} (${p.branch || 'N/A'})\n[INFO] Run AI tests...\n${passed ? '[INFO] All good' : '[ERROR] Some tests failed'}\n[INFO] Coverage: ${newCoverage}%`,
-          };
-          return { ...p, lastRun: passed ? 'Passed' : 'Failed', coverage: newCoverage, lastReport: mockReport };
-        })
-      );
-      setSnackbar({ open: true, message: 'Auto scan finished via webhook', severity: 'success' });
-    }, 1200);
+  const handleDeleteProject = async (projectId) => {
+    try {
+      // TODO: Add delete endpoint
+      setProjects(projects.filter(project => project.id !== projectId));
+      setSnackbar({
+        open: true,
+        message: 'Project deleted successfully!',
+        severity: 'success',
+      });
+    } catch (err) {
+      console.error('Failed to delete project:', err);
+      setSnackbar({
+        open: true,
+        message: `Failed to delete project: ${err.message}`,
+        severity: 'error',
+      });
+    }
   };
 
   const handleCloseSnackbar = () => {
@@ -215,27 +191,25 @@ const ProjectsNew = ({ onNavigate }) => {
 
   const openReport = (project) => {
     if (project.lastRun === 'Running') return;
-    if (!project.lastReport) {
-      const status = project.lastRun && project.lastRun !== 'Not run' ? project.lastRun : 'Not run';
-      const coverageBefore = Math.max(0, (project.coverage || 0) - 1);
-      const mockReport = {
-        status,
-        total: 42,
-        passed: status === 'Passed' ? 41 : status === 'Failed' ? 37 : 0,
-        failed: status === 'Passed' ? 1 : status === 'Failed' ? 5 : 0,
-        duration: status === 'Not run' ? '—' : '1m 45s',
-        coverageBefore,
-        coverageAfter: project.coverage || 0,
-        failedTests: status === 'Failed' ? [
-          { name: 'critical flow should pass', error: 'AssertionError: expected true to be false' },
-        ] : [],
-        logs: status === 'Not run' ? 'No report available yet.' : '[INFO] Loaded cached report.',
-      };
-      setProjects((prev) => prev.map((p) => (p.id === project.id ? { ...p, lastReport: mockReport } : p)));
-      setReportModal({ open: true, report: mockReport, projectName: project.name });
-    } else {
-      setReportModal({ open: true, report: project.lastReport, projectName: project.name });
-    }
+    
+    // For now, create a mock report
+    const status = project.lastRun && project.lastRun !== 'Not run' ? project.lastRun : 'Not run';
+    const coverageBefore = Math.max(0, (project.coverage || 0) - 1);
+    const mockReport = {
+      status,
+      total: 42,
+      passed: status === 'Passed' ? 41 : status === 'Failed' ? 37 : 0,
+      failed: status === 'Passed' ? 1 : status === 'Failed' ? 5 : 0,
+      duration: status === 'Not run' ? '—' : '1m 45s',
+      coverageBefore,
+      coverageAfter: project.coverage || 0,
+      failedTests: status === 'Failed' ? [
+        { name: 'critical flow should pass', error: 'AssertionError: expected true to be false' },
+      ] : [],
+      logs: status === 'Not run' ? 'No report available yet.' : '[INFO] Loaded cached report.',
+    };
+    
+    setReportModal({ open: true, report: mockReport, projectName: project.name });
   };
 
   const filteredProjects = useMemo(() => {
@@ -248,6 +222,27 @@ const ProjectsNew = ({ onNavigate }) => {
       return matchesSearch && matchesStatus && matchesProvider;
     });
   }, [projects, filters]);
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress size={60} />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Failed to load projects: {error}
+        </Alert>
+        <Button variant="contained" onClick={loadProjects}>
+          Retry
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ flexGrow: 1, p: 3 }}>
