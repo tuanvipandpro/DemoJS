@@ -1,49 +1,64 @@
 # InsightTestAI
 
-InsightTestAI là một nền tảng AI-powered testing cho các dự án phần mềm, tích hợp với các Git providers để tự động hóa quá trình testing.
+InsightTestAI là một nền tảng AI-powered testing cho các dự án phần mềm, tích hợp với các Git providers để tự động hóa quá trình testing và quản lý dự án.
 
-## Tính năng mới: Personal Access Token
+## 🚀 Tính năng chính
 
-### Cách sử dụng Personal Access Token
+### 🔐 Xác thực đa phương thức
+- **Local Authentication**: Đăng ký/đăng nhập bằng username/password
+- **GitHub OAuth**: Đăng nhập thông qua GitHub
+- **JWT Token**: Hỗ trợ Bearer token cho API calls
+- **Session-based**: Hỗ trợ session cookies
 
-Thay vì sử dụng OAuth popup, giờ đây bạn có thể kết nối repository bằng Personal Access Token:
+### 🗂️ Quản lý dự án
+- Tạo và quản lý dự án với thông tin chi tiết
+- Theo dõi tiến độ, ngân sách, độ ưu tiên
+- Quản lý team và thông báo
+- Tích hợp với Git repositories
 
-1. **Tạo Personal Access Token trên GitHub:**
-   - Vào GitHub Settings > Developer settings > Personal access tokens > Tokens (classic)
-   - Click "Generate new token (classic)"
-   - Chọn scope: `repo` (để truy cập repositories)
-   - Copy token được tạo ra
+### 🔗 Tích hợp Git Providers
+- **GitHub**: Hỗ trợ OAuth và Personal Access Token
+- **Azure DevOps**: Hỗ trợ Personal Access Token
+- **Bitbucket**: Hỗ trợ Personal Access Token
+- **GitLab**: Hỗ trợ Personal Access Token
 
-2. **Kết nối Repository:**
-   - Trong modal tạo project, chọn Git provider (GitHub)
-   - Click "Connect Repository"
-   - Nhập Personal Access Token vào input field
-   - Click "Connect with Token"
+### 🤖 AI Testing
+- Vector search và embedding
+- Tự động hóa quá trình testing
+- Báo cáo và phân tích kết quả
 
-3. **Chọn Repository và Branch:**
-   - Sau khi connect thành công, chọn repository từ dropdown
-   - Dropdown hiển thị thông tin chi tiết: tên, mô tả, ngôn ngữ, private status
-   - Sau khi chọn repository, branch dropdown sẽ tự động load
-   - Chọn branch mong muốn từ danh sách
+## 🏗️ Cấu trúc dự án
 
-4. **Bảo mật:**
-   - Token sẽ được mã hóa và lưu trữ an toàn trong database
-   - Token chỉ được sử dụng để truy cập repositories
-   - Token không được lưu trong project data hoặc localStorage
+```
+InsightTestAI/
+├── src/                          # Frontend React app
+│   ├── components/               # React components
+│   ├── pages/                    # Page components
+│   ├── contexts/                 # React contexts
+│   ├── services/                 # API services
+│   └── theme/                    # UI theme
+├── server/                       # Backend Node.js/Express
+│   ├── src/
+│   │   ├── auth/                 # Authentication logic
+│   │   ├── config/               # Configuration files
+│   │   ├── db/                   # Database initialization
+│   │   ├── middleware/           # Express middleware
+│   │   ├── routes/               # API routes
+│   │   ├── utils/                # Utility functions
+│   │   └── swagger.js            # API documentation
+│   └── package.json
+├── public/                       # Static assets
+└── package.json                  # Frontend dependencies
+```
 
-### Ưu điểm của cách tiếp cận mới
+## 🛠️ Cài đặt và chạy
 
-- **Bảo mật cao hơn:** Không cần popup OAuth, giảm rủi ro bảo mật
-- **Kiểm soát tốt hơn:** Bạn có thể tạo token với quyền hạn cụ thể
-- **Ổn định hơn:** Không phụ thuộc vào OAuth flow có thể bị gián đoạn
-- **Dễ dàng quản lý:** Có thể revoke token bất cứ lúc nào từ GitHub
-- **UI/UX tốt hơn:** Dropdown hiển thị thông tin chi tiết về repository
-- **Tự động hóa:** Branch dropdown tự động load sau khi chọn repository
-
-## Cài đặt và chạy
+### Yêu cầu hệ thống
+- Node.js 18+ 
+- PostgreSQL 12+
+- Git
 
 ### Cách 1: Khởi động tự động (Khuyến nghị)
-Sử dụng script có sẵn để khởi động cả frontend và backend:
 
 **Windows (PowerShell):**
 ```powershell
@@ -58,24 +73,18 @@ chmod +x start-dev.sh
 
 ### Cách 2: Khởi động thủ công
 
-**Backend:**
+**1. Cài đặt dependencies:**
 ```bash
+# Frontend
+npm install
+
+# Backend
 cd server
 npm install
-npm run dev
 ```
 
-**Frontend (trong terminal mới):**
-```bash
-npm install
-npm run dev
-```
-
-**Lưu ý:** Frontend sẽ tự động chạy ở port có sẵn (thường là 5173, 5174, hoặc 5175). Nếu gặp lỗi CORS, hãy đảm bảo backend đã được cấu hình đúng.
-
-## Cấu hình môi trường
-
-### Backend (.env trong thư mục server)
+**2. Cấu hình môi trường:**
+Tạo file `.env` trong thư mục `server/`:
 ```env
 DATABASE_URL=postgresql://username:password@localhost:5432/insighttestai
 GITHUB_CLIENT_ID=your_github_client_id
@@ -84,123 +93,198 @@ SESSION_SECRET=your_session_secret
 CORS_ORIGIN=http://localhost:5175
 ```
 
-### Frontend (.env trong thư mục gốc)
+Tạo file `.env` trong thư mục gốc:
 ```env
 VITE_API_PROXY_TARGET=http://localhost:3001
 VITE_DEV_PORT=5175
 VITE_GITHUB_CLIENT_ID=your_github_client_id
 ```
 
-### Cấu hình CORS
+**3. Khởi động services:**
+```bash
+# Terminal 1: Backend
+cd server
+npm run dev
 
-Backend hỗ trợ nhiều origins mặc định:
-- `http://localhost:5173` (Vite default)
-- `http://localhost:5174` (Vite alternate)
-- `http://localhost:5175` (Vite alternate)
-- `http://localhost:3000` (Create React App default)
-- `http://localhost:3001` (Backend port)
+# Terminal 2: Frontend
+npm run dev
+```
 
-Nếu frontend chạy ở port khác, thêm vào biến môi trường `CORS_ORIGIN`.
+## 🗄️ Database Schema
 
-## Database Schema
-
-Bảng `user_provider_tokens` được sử dụng để lưu trữ Personal Access Token:
+### Bảng chính
 
 ```sql
+-- Users table
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username VARCHAR(50) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE,
+  display_name VARCHAR(100),
+  password_hash VARCHAR(255),
+  provider VARCHAR(20) DEFAULT 'local',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- User provider tokens
 CREATE TABLE user_provider_tokens (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   provider TEXT NOT NULL,
   access_token TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (user_id, provider)
+);
+
+-- Projects table
+CREATE TABLE projects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  start_date TIMESTAMPTZ,
+  end_date TIMESTAMPTZ,
+  team VARCHAR(100),
+  priority VARCHAR(20) DEFAULT 'Medium',
+  budget VARCHAR(50),
+  git_provider VARCHAR(50),
+  repository VARCHAR(255),
+  branch VARCHAR(100),
+  notifications JSONB DEFAULT '[]',
+  status VARCHAR(50) DEFAULT 'Planning',
+  progress INTEGER DEFAULT 0,
+  coverage INTEGER DEFAULT 0,
+  last_run TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
 );
 ```
 
-## API Endpoints
+## 🔌 API Endpoints
 
-### POST /api/github/connect-with-token
-Kết nối với GitHub bằng Personal Access Token:
+### Authentication
+- `GET /api/auth/me` - Thông tin user hiện tại
+- `POST /api/auth/register` - Đăng ký user
+- `POST /api/auth/login` - Đăng nhập
+- `POST /api/auth/logout` - Đăng xuất
+- `GET /api/auth/profile` - Lấy profile
+- `PUT /api/auth/profile` - Cập nhật profile
+- `POST /api/auth/token/refresh` - Làm mới token
 
-**Request:**
-```json
-{
-  "token": "ghp_xxxxxxxxxxxxxxxxxxxx",
-  "provider": "github"
-}
-```
+### GitHub Integration
+- `GET /api/github/repos` - Danh sách repositories
+- `GET /api/github/repos/:owner/:repo/branches` - Danh sách branches
+- `POST /api/github/connect-with-token` - Kết nối bằng Personal Access Token
+- `POST /api/github/repos/with-code` - Kết nối bằng OAuth code
+- `GET /api/github/projects` - Lấy dự án từ server
+- `POST /api/github/projects` - Tạo dự án mới
 
-**Response:**
-```json
-{
-  "success": true,
-  "user": {
-    "login": "username",
-    "name": "User Name",
-    "email": "user@example.com",
-    "avatar_url": "https://avatars.githubusercontent.com/..."
-  },
-  "repositories": [...]
-}
-```
+### Vector Operations
+- `POST /api/vectors/insert` - Chèn tài liệu với embedding
+- `POST /api/vectors/search` - Tìm kiếm theo embedding
 
-## Bảo mật
+### Health Check
+- `GET /api/health` - Kiểm tra trạng thái server
 
+## 🔐 Xác thực và bảo mật
+
+### Personal Access Token
+Thay vì sử dụng OAuth popup, bạn có thể kết nối repository bằng Personal Access Token:
+
+1. **Tạo Personal Access Token trên GitHub:**
+   - Vào GitHub Settings > Developer settings > Personal access tokens > Tokens (classic)
+   - Click "Generate new token (classic)"
+   - Chọn scope: `repo` (để truy cập repositories)
+   - Copy token được tạo ra
+
+2. **Kết nối Repository:**
+   - Trong modal tạo project, chọn Git provider (GitHub)
+   - Click "Connect Repository"
+   - Nhập Personal Access Token vào input field
+   - Click "Connect with Token"
+
+### Bảo mật
 - Tất cả API endpoints đều yêu cầu xác thực
 - Personal Access Token được mã hóa trước khi lưu vào database
-- Token chỉ được sử dụng cho mục đích truy cập repositories
-- Không có token nào được lưu trong frontend hoặc localStorage
+- Token chỉ được sử dụng để truy cập repositories
+- Hỗ trợ CORS với cấu hình linh hoạt
 
-## Hỗ trợ
+## 🎨 Frontend Features
 
-Nếu gặp vấn đề với Personal Access Token:
+### UI Components
+- **Material-UI**: Giao diện hiện đại và responsive
+- **Data Grid**: Hiển thị dữ liệu dự án với sorting và filtering
+- **Date Pickers**: Chọn ngày tháng cho dự án
+- **Charts**: Biểu đồ thống kê với Recharts
 
-1. **Token không hợp lệ:** Kiểm tra token có đúng format và còn hiệu lực không
-2. **Quyền hạn không đủ:** Đảm bảo token có scope `repo`
-3. **Token đã hết hạn:** Tạo token mới và thử lại
+### State Management
+- **React Context**: Quản lý state toàn cục
+- **Auth Context**: Quản lý trạng thái xác thực
+- **Theme Context**: Quản lý theme và giao diện
+- **Error Context**: Xử lý lỗi tập trung
 
-## Đóng góp
+## 🚀 Deployment
 
-Mọi đóng góp đều được chào đón! Vui lòng tạo issue hoặc pull request.
+### Production Build
+```bash
+# Frontend
+npm run build
 
-## Test và Debug
+# Backend
+cd server
+npm start
+```
+
+### Docker (Tùy chọn)
+```bash
+docker-compose up -d
+```
+
+## 🧪 Testing
 
 ### Test API Endpoints
-
-Sau khi khởi động backend, bạn có thể test API endpoints:
-
 ```bash
-# Test health endpoint
+# Health check
 curl http://localhost:3001/api/health
 
-# Test GitHub connect endpoint (cần session)
+# GitHub connect (cần session)
 curl -X POST http://localhost:3001/api/github/connect-with-token \
   -H "Content-Type: application/json" \
   -d '{"token": "ghp_YOUR_TOKEN", "provider": "github"}'
 ```
 
 ### Debug Frontend
+1. Mở Developer Tools (F12)
+2. Kiểm tra Console để xem lỗi
+3. Kiểm tra Network để xem API calls
+4. Kiểm tra Application để xem localStorage
 
-1. **Mở Developer Tools** (F12)
-2. **Kiểm tra Console** để xem lỗi
-3. **Kiểm tra Network** để xem API calls
-4. **Kiểm tra Application** để xem localStorage
+## 🔧 Troubleshooting
 
-### Troubleshooting
-
-#### CORS Error
+### CORS Error
 - Backend không chạy ở port 3001
 - CORS_ORIGIN không đúng trong server/.env
 - Restart backend sau khi thay đổi .env
 
-#### Token Error
+### Token Error
 - Token không đúng format (ghp_...)
 - Token không có scope 'repo'
 - Token đã hết hạn
 
-#### Database Error
+### Database Error
 - DATABASE_URL không đúng
 - Database không chạy
-- Bảng user_provider_tokens không tồn tại
+- Bảng cần thiết không tồn tại
 
-Xem file `test-api.md` để biết thêm chi tiết về testing.
+## 📚 Tài liệu API
+
+Xem file `server/src/swagger.js` để biết chi tiết đầy đủ về API endpoints, schemas và responses.
+
+## 🤝 Đóng góp
+
+Mọi đóng góp đều được chào đón! Vui lòng tạo issue hoặc pull request.
+
+## 📄 License
+
+Dự án này được phát hành dưới MIT License.
