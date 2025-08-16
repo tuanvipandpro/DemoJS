@@ -97,14 +97,6 @@ export const openApiSpec = {
           provider: { type: 'string', enum: ['github'] }
         }
       },
-      GitHubOAuthRequest: {
-        type: 'object',
-        required: ['code'],
-        properties: {
-          code: { type: 'string', description: 'OAuth authorization code' },
-          redirectUri: { type: 'string', description: 'OAuth redirect URI' }
-        }
-      },
       GitHubUser: {
         type: 'object',
         properties: {
@@ -131,8 +123,10 @@ export const openApiSpec = {
       Branch: {
         type: 'object',
         properties: {
-          name: { type: 'string' },
-          commitSha: { type: 'string' }
+          name: { type: 'string', description: 'Tên branch' },
+          commitSha: { type: 'string', description: 'SHA của commit cuối cùng' },
+          commitUrl: { type: 'string', format: 'uri', description: 'URL của commit' },
+          protection: { type: 'object', description: 'Thông tin bảo vệ branch (nếu có)' }
         }
       },
       GitHubConnectResponse: {
@@ -152,46 +146,105 @@ export const openApiSpec = {
         type: 'object',
         properties: {
           id: { type: 'string', format: 'uuid' },
-          name: { type: 'string' },
-          description: { type: 'string' },
-          startDate: { type: 'string', format: 'date-time' },
-          endDate: { type: 'string', format: 'date-time' },
-          team: { type: 'string' },
-          priority: { type: 'string', enum: ['Low', 'Medium', 'High', 'Critical'] },
-          budget: { type: 'string' },
-          gitProvider: { type: 'string' },
-          repository: { type: 'string' },
-          branch: { type: 'string' },
+          name: { type: 'string', description: 'Tên dự án' },
+          description: { type: 'string', description: 'Mô tả dự án' },
+          gitProvider: { type: 'string', description: 'Nhà cung cấp Git (github, gitlab, etc.)' },
+          repository: { type: 'string', description: 'Tên repository' },
+          branch: { type: 'string', description: 'Nhánh chính' },
+          ownerId: { type: 'string', format: 'uuid', description: 'ID của user tạo project' },
+          personalAccessToken: { 
+            type: 'string', 
+            description: 'Personal Access Token đã mã hóa (masked as ***ENCRYPTED*** in responses)'
+          },
           notifications: { 
             type: 'array',
-            items: { type: 'string' }
+            items: { type: 'string' },
+            description: 'Danh sách thông báo (email, slack, etc.)'
           },
-          status: { type: 'string', enum: ['Planning', 'Active', 'Testing', 'Completed', 'On Hold'] },
-          progress: { type: 'integer', minimum: 0, maximum: 100 },
-          coverage: { type: 'integer', minimum: 0, maximum: 100 },
-          lastRun: { type: 'string', format: 'date-time' },
-          createdAt: { type: 'string', format: 'date-time' },
-          updatedAt: { type: 'string', format: 'date-time' }
+          createdAt: { type: 'string', format: 'date-time', description: 'Thời gian tạo' },
+          isDelete: { type: 'boolean', description: 'Trạng thái xóa (soft delete)', default: false },
+          isDisable: { type: 'boolean', description: 'Trạng thái vô hiệu hóa', default: false },
+          status: { type: 'string', description: 'Trạng thái dự án', default: 'active' }
         }
       },
       CreateProjectRequest: {
         type: 'object',
-        required: ['name', 'description'],
+        required: ['name'],
         properties: {
-          name: { type: 'string', maxLength: 255 },
-          description: { type: 'string' },
-          startDate: { type: 'string', format: 'date-time' },
-          endDate: { type: 'string', format: 'date-time' },
-          team: { type: 'string', maxLength: 100 },
-          priority: { type: 'string', enum: ['Low', 'Medium', 'High', 'Critical'] },
-          budget: { type: 'string', maxLength: 50 },
-          gitProvider: { type: 'string', maxLength: 50 },
-          repository: { type: 'string', maxLength: 255 },
-          branch: { type: 'string', maxLength: 100 },
+          name: { type: 'string', maxLength: 255, description: 'Tên dự án (bắt buộc)' },
+          description: { type: 'string', description: 'Mô tả dự án' },
+          gitProvider: { type: 'string', maxLength: 50, description: 'Nhà cung cấp Git' },
+          repository: { type: 'string', maxLength: 255, description: 'Tên repository' },
+          branch: { type: 'string', maxLength: 100, description: 'Nhánh chính' },
+          personalAccessToken: { 
+            type: 'string', 
+            description: 'Personal Access Token (sẽ được mã hóa và lưu an toàn)'
+          },
           notifications: { 
             type: 'array',
-            items: { type: 'string' }
+            items: { type: 'string' },
+            description: 'Danh sách thông báo'
           }
+        }
+      },
+      UpdateProjectRequest: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', maxLength: 255, description: 'Tên dự án' },
+          description: { type: 'string', description: 'Mô tả dự án' },
+          gitProvider: { type: 'string', maxLength: 50, description: 'Nhà cung cấp Git' },
+          repository: { type: 'string', maxLength: 255, description: 'Tên repository' },
+          branch: { type: 'string', maxLength: 100, description: 'Nhánh chính' },
+          personalAccessToken: { 
+            type: 'string', 
+            description: 'Personal Access Token mới (sẽ được mã hóa và lưu an toàn)'
+          },
+          notifications: { 
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Danh sách thông báo'
+          },
+          status: { type: 'string', description: 'Trạng thái dự án' }
+        }
+      },
+      ProjectResponse: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean' },
+          project: { $ref: '#/components/schemas/Project' }
+        }
+      },
+      ProjectsResponse: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean' },
+          projects: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/Project' }
+          }
+        }
+      },
+      ProjectDisableRequest: {
+        type: 'object',
+        required: ['isDisable'],
+        properties: {
+          isDisable: { type: 'boolean', description: 'Trạng thái vô hiệu hóa' }
+        }
+      },
+      ProjectStatusRequest: {
+        type: 'object',
+        required: ['status'],
+        properties: {
+          status: { type: 'string', description: 'Trạng thái dự án' }
+        }
+      },
+      GitHubTokenResponse: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean' },
+          token: { type: 'string', description: 'GitHub Personal Access Token đã giải mã' },
+          gitProvider: { type: 'string', description: 'Git provider' },
+          repository: { type: 'string', description: 'Tên repository' }
         }
       },
       
@@ -544,48 +597,6 @@ export const openApiSpec = {
       }
     },
     
-    '/auth/github/oauth/exchange': {
-      post: {
-        tags: ['GitHub'],
-        summary: 'Exchange GitHub OAuth code',
-        description: 'Exchange GitHub OAuth authorization code để lấy access token',
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: { $ref: '#/components/schemas/GitHubOAuthRequest' }
-            }
-          }
-        },
-        responses: {
-          200: { 
-            description: 'OAuth exchange thành công',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/GitHubConnectResponse' }
-              }
-            }
-          },
-          400: { 
-            description: 'Bad Request - Code không hợp lệ',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' }
-              }
-            }
-          },
-          500: { 
-            description: 'Server error - Lỗi khi exchange token',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' }
-              }
-            }
-          }
-        }
-      }
-    },
-    
     // GitHub endpoints
     '/github/repos': {
       get: {
@@ -612,7 +623,7 @@ export const openApiSpec = {
             }
           },
           401: { 
-            description: 'Unauthorized - Cần GitHub OAuth',
+            description: 'Unauthorized - Cần đăng nhập',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -624,7 +635,7 @@ export const openApiSpec = {
     },
     
     '/github/repos/{owner}/{repo}/branches': {
-      get: {
+      post: {
         tags: ['GitHub'],
         summary: 'Danh sách branch của repository',
         description: 'Lấy danh sách branches của một repository cụ thể',
@@ -644,20 +655,69 @@ export const openApiSpec = {
             description: 'Tên repository'
           }
         ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['githubToken'],
+                properties: {
+                  githubToken: { 
+                    type: 'string', 
+                    description: 'GitHub Personal Access Token để truy cập repository' 
+                  }
+                }
+              }
+            }
+          }
+        },
         responses: {
           200: { 
             description: 'Danh sách branches',
             content: {
               'application/json': {
                 schema: {
-                  type: 'array',
-                  items: { $ref: '#/components/schemas/Branch' }
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    repository: { type: 'string' },
+                    branches: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/Branch' }
+                    },
+                    total: { type: 'integer' }
+                  }
                 }
               }
             }
           },
+          400: { 
+            description: 'Bad Request - Token không hợp lệ',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
           401: { 
-            description: 'Unauthorized - Cần GitHub OAuth',
+            description: 'Unauthorized - Cần đăng nhập',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: { 
+            description: 'Repository không tìm thấy',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          500: { 
+            description: 'Server error - Lỗi khi lấy branches',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -672,7 +732,7 @@ export const openApiSpec = {
       post: {
         tags: ['GitHub'],
         summary: 'Kết nối GitHub bằng Personal Access Token',
-        description: 'Kết nối với GitHub sử dụng Personal Access Token thay vì OAuth',
+        description: 'Kết nối với GitHub sử dụng Personal Access Token',
         requestBody: {
           required: true,
           content: {
@@ -726,73 +786,32 @@ export const openApiSpec = {
       }
     },
     
-    '/github/repos/with-code': {
-      post: {
-        tags: ['GitHub'],
-        summary: 'Kết nối GitHub bằng OAuth code',
-        description: 'Kết nối với GitHub sử dụng OAuth authorization code',
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: { $ref: '#/components/schemas/GitHubOAuthRequest' }
-            }
-          }
-        },
-        responses: {
-          200: { 
-            description: 'Kết nối thành công',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/GitHubConnectResponse' }
-              }
-            }
-          },
-          400: { 
-            description: 'Bad Request - Code không hợp lệ',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' }
-              }
-            }
-          },
-          500: { 
-            description: 'Server error - Lỗi khi kết nối GitHub',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' }
-              }
-            }
-          }
-        }
-      }
-    },
-    
-    '/github/projects': {
+    '/projects': {
       get: {
-        tags: ['GitHub'],
-        summary: 'Lấy dự án từ server',
-        description: 'Lấy danh sách dự án của user từ database',
+        tags: ['Projects'],
+        summary: 'Lấy danh sách dự án',
+        description: 'Lấy danh sách dự án của user đang đăng nhập. Admin có thể truyền owner_id để xem projects của user khác.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'query',
+            name: 'owner_id',
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của user (cho admin)',
+            required: false
+          }
+        ],
         responses: {
           200: { 
             description: 'Danh sách dự án',
             content: {
               'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: { type: 'boolean' },
-                    projects: {
-                      type: 'array',
-                      items: { $ref: '#/components/schemas/Project' }
-                    }
-                  }
-                }
+                schema: { $ref: '#/components/schemas/ProjectsResponse' }
               }
             }
           },
           401: { 
-            description: 'Unauthorized',
+            description: 'Unauthorized - Cần JWT token',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -803,9 +822,10 @@ export const openApiSpec = {
       },
       
       post: {
-        tags: ['GitHub'],
+        tags: ['Projects'],
         summary: 'Tạo dự án mới',
-        description: 'Tạo dự án mới với thông tin từ request body',
+        description: 'Tạo dự án mới. Chỉ cần cung cấp name, các field khác là optional. owner_id sẽ tự động lấy từ JWT token.',
+        security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -819,13 +839,7 @@ export const openApiSpec = {
             description: 'Dự án được tạo thành công',
             content: {
               'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: { type: 'boolean' },
-                    project: { $ref: '#/components/schemas/Project' }
-                  }
-                }
+                schema: { $ref: '#/components/schemas/ProjectResponse' }
               }
             }
           },
@@ -838,7 +852,7 @@ export const openApiSpec = {
             }
           },
           401: { 
-            description: 'Unauthorized',
+            description: 'Unauthorized - Cần JWT token',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -847,6 +861,380 @@ export const openApiSpec = {
           },
           500: { 
             description: 'Server error - Lỗi khi tạo dự án',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+    
+    // Project endpoints
+    '/projects/{id}': {
+      get: {
+        tags: ['Projects'],
+        summary: 'Lấy dự án theo ID',
+        description: 'Lấy thông tin chi tiết của một dự án cụ thể. User chỉ có thể xem projects của mình.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { 
+            in: 'path', 
+            name: 'id', 
+            required: true, 
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của dự án'
+          }
+        ],
+        responses: {
+          200: { 
+            description: 'Thông tin dự án',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ProjectResponse' }
+              }
+            }
+          },
+          401: { 
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          403: { 
+            description: 'Forbidden - Không có quyền truy cập project này',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: { 
+            description: 'Dự án không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      },
+      
+      put: {
+        tags: ['Projects'],
+        summary: 'Cập nhật dự án',
+        description: 'Cập nhật thông tin của một dự án. User chỉ có thể update projects của mình.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { 
+            in: 'path', 
+            name: 'id', 
+            required: true, 
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của dự án'
+          }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/UpdateProjectRequest' }
+            }
+          }
+        },
+        responses: {
+          200: { 
+            description: 'Dự án được cập nhật thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ProjectResponse' }
+              }
+            }
+          },
+          400: { 
+            description: 'Bad Request - Dữ liệu không hợp lệ',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          401: { 
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          403: { 
+            description: 'Forbidden - Không có quyền update project này',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: { 
+            description: 'Dự án không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      },
+      
+      delete: {
+        tags: ['Projects'],
+        summary: 'Xóa dự án (Soft Delete)',
+        description: 'Xóa một dự án theo ID. Thực hiện soft delete (set is_delete = true). User chỉ có thể xóa projects của mình.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { 
+            in: 'path', 
+            name: 'id', 
+            required: true, 
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của dự án'
+          }
+        ],
+        responses: {
+          200: { 
+            description: 'Dự án được xóa thành công',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    message: { type: 'string' }
+                  }
+                }
+              }
+            }
+          },
+          401: { 
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          403: { 
+            description: 'Forbidden - Không có quyền xóa project này',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: { 
+            description: 'Dự án không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+    
+    // Project disable endpoint
+    '/projects/{id}/disable': {
+      patch: {
+        tags: ['Projects'],
+        summary: 'Vô hiệu hóa/Bật dự án',
+        description: 'Cập nhật trạng thái vô hiệu hóa của dự án. User chỉ có thể thao tác với projects của mình.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { 
+            in: 'path', 
+            name: 'id', 
+            required: true, 
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của dự án'
+          }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ProjectDisableRequest' }
+            }
+          }
+        },
+        responses: {
+          200: { 
+            description: 'Trạng thái vô hiệu hóa được cập nhật thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ProjectResponse' }
+              }
+            }
+          },
+          400: { 
+            description: 'Bad Request - Dữ liệu không hợp lệ',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          401: { 
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          403: { 
+            description: 'Forbidden - Không có quyền thao tác project này',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: { 
+            description: 'Dự án không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+    
+    // Project status endpoint
+    '/projects/{id}/status': {
+      patch: {
+        tags: ['Projects'],
+        summary: 'Cập nhật trạng thái dự án',
+        description: 'Cập nhật trạng thái của dự án. User chỉ có thể thao tác với projects của mình.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { 
+            in: 'path', 
+            name: 'id', 
+            required: true, 
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của dự án'
+          }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ProjectStatusRequest' }
+            }
+          }
+        },
+        responses: {
+          200: { 
+            description: 'Trạng thái dự án được cập nhật thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ProjectResponse' }
+              }
+            }
+          },
+          400: { 
+            description: 'Bad Request - Dữ liệu không hợp lệ',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          401: { 
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          403: { 
+            description: 'Forbidden - Không có quyền thao tác project này',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: { 
+            description: 'Dự án không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+    
+    // GET /api/projects/{id}/github-token - Lấy GitHub token đã lưu
+    '/projects/{id}/github-token': {
+      get: {
+        tags: ['Projects'],
+        summary: 'Lấy GitHub token đã lưu cho project',
+        description: 'Lấy GitHub Personal Access Token đã được mã hóa và lưu cho project cụ thể. User chỉ có thể lấy token của projects của mình.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { 
+            in: 'path', 
+            name: 'id', 
+            required: true, 
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của project'
+          }
+        ],
+        responses: {
+          200: { 
+            description: 'GitHub token và thông tin repository',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/GitHubTokenResponse' }
+              }
+            }
+          },
+          401: { 
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          403: { 
+            description: 'Forbidden - Không có quyền truy cập project này',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: { 
+            description: 'Project không tìm thấy hoặc không có GitHub token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          500: { 
+            description: 'Server error - Lỗi khi giải mã token',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -957,6 +1345,4 @@ export const openApiSpec = {
       }
     }
   }
-};
-
-
+}

@@ -1,9 +1,24 @@
 import session from 'express-session';
+import pgSimple from 'connect-pg-simple';
 import { extractBearerToken, verifyToken } from '../utils/jwt.js';
 
 const hourMs = 1000 * 60 * 60;
 
+// Tạo PostgreSQL session store
+const PostgresStore = pgSimple(session);
+
 export const sessionConfig = {
+  store: new PostgresStore({
+    conObject: {
+      user: process.env.DB_USER || 'insight',
+      password: process.env.DB_PASS || 'insight',
+      host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT || 5432,
+      database: process.env.DB_NAME || 'insighttestai',
+    },
+    tableName: 'sessions',
+    createTableIfMissing: true,
+  }),
   secret: process.env.SESSION_SECRET || 'dev_secret_change_me',
   resave: false,
   saveUninitialized: false,

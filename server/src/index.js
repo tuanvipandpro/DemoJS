@@ -11,8 +11,9 @@ import { initDatabase } from './db/init.js';
 
 import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.js';
-import githubRouter from './routes/github.js';
 import vectorsRouter from './routes/vectors.js';
+import projectsRouter from './routes/projects.js';
+import githubRouter from './routes/github.js';
 import { openApiSpec } from './swagger.js';
 import swaggerUi from 'swagger-ui-express';
 import { logger } from './utils/logger.js';
@@ -68,8 +69,9 @@ app.use(httpLogger);
 
 app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);
-app.use('/api/github', githubRouter);
 app.use('/api/vectors', vectorsRouter);
+app.use('/api/projects', projectsRouter);
+app.use('/api/github', githubRouter);
 app.get('/api/docs.json', (_req, res) => res.json(openApiSpec));
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 

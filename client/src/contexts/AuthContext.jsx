@@ -26,8 +26,8 @@ export const AuthProvider = ({ children }) => {
     (async () => {
       try {
         const res = await api.get('/auth/me');
-        if (res.ok) {
-          const data = await res.json();
+        if (res.status === 200) {
+          const data = res.data;
           setUser(data.user || null);
           setIsAuthenticated(!!data.user);
         } else {
@@ -45,22 +45,22 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       const res = await api.post('/auth/login', { provider: 'local', username, password });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        return { success: false, error: data.error || 'Login failed' };
+      if (res.status === 200) {
+        const tokens = res.data;
+        if (tokens.access_token) setAccessToken(tokens.access_token);
+        if (tokens.refresh_token) setRefreshToken(tokens.refresh_token);
+        setIsAuthenticated(true);
+        const meRes = await api.get('/auth/me');
+        if (meRes.status === 200) {
+          const me = meRes.data;
+          setUser(me.user || null);
+        }
+        return { success: true };
+      } else {
+        return { success: false, error: res.data?.error || 'Login failed' };
       }
-      const tokens = await res.json();
-      if (tokens.access_token) setAccessToken(tokens.access_token);
-      if (tokens.refresh_token) setRefreshToken(tokens.refresh_token);
-      setIsAuthenticated(true);
-      const meRes = await api.get('/auth/me');
-      if (meRes.ok) {
-        const me = await meRes.json();
-        setUser(me.user || null);
-      }
-      return { success: true };
     } catch (err) {
-      return { success: false, error: 'Login error' };
+      return { success: false, error: err.response?.data?.error || 'Login error' };
     } finally {
       setLoading(false);
     }

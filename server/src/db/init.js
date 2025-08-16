@@ -3,11 +3,18 @@ import pkg from 'pg';
 
 const { Pool } = pkg;
 
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+// Cấu hình database từ các biến môi trường riêng lẻ
+const dbConfig = {
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT) || 5432,
+  database: process.env.DB_NAME || 'insight',
   max: Number(process.env.PG_POOL_MAX || 10),
   idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 30000),
-});
+};
+
+export const pool = new Pool(dbConfig);
 
 export async function initDatabase() {
   const client = await pool.connect();
@@ -80,37 +87,36 @@ export async function initDatabase() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS projects (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         description TEXT,
-        status TEXT DEFAULT 'Planning',
-        progress INTEGER DEFAULT 0,
-        start_date TIMESTAMPTZ,
-        end_date TIMESTAMPTZ,
-        team TEXT,
-        priority TEXT DEFAULT 'Medium',
-        budget TEXT,
-        coverage INTEGER DEFAULT 0,
-        last_run TEXT DEFAULT 'Not run',
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         git_provider TEXT,
+        personal_access_token TEXT,
         repository TEXT,
         branch TEXT,
+        owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         notifications TEXT DEFAULT '[]',
-        personal_access_token TEXT
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        is_delete BOOLEAN DEFAULT false,
+        is_disable BOOLEAN DEFAULT false,
+        status TEXT DEFAULT 'active'
       );
     `);
 
     // Add indexes for better performance
     await client.query(`
-      CREATE INDEX IF NOT EXISTS projects_user_id_idx ON projects(user_id);
+      CREATE INDEX IF NOT EXISTS projects_owner_id_idx ON projects(owner_id);
     `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS projects_status_idx ON projects(status);
     `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS projects_created_at_idx ON projects(created_at);
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS projects_is_delete_idx ON projects(is_delete);
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS projects_is_disable_idx ON projects(is_disable);
     `);
   } finally {
     client.release();

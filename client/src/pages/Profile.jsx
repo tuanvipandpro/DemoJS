@@ -14,8 +14,8 @@ const Profile = () => {
     (async () => {
       try {
         const res = await api.get('/auth/profile');
-        if (res.ok) {
-          const data = await res.json();
+        if (res.status === 200) {
+          const data = res.data;
           setForm({
             displayName: data.profile?.display_name || data.profile?.displayName || '',
             email: data.profile?.email || '',
@@ -38,8 +38,8 @@ const Profile = () => {
     setLoading(true);
     try {
       const res = await api.put('/auth/profile', form);
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+      if (res.status !== 200) {
+        const data = res.data;
         setError(data.error || 'Update failed');
       } else {
         setSuccess('Profile updated');

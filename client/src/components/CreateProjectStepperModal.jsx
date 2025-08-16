@@ -307,12 +307,12 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
           provider: 'github'
         });
         
-        if (!response.ok) {
-          const errorData = await response.json();
+        if (response.status !== 200) {
+          const errorData = response.data;
           throw new Error(errorData.message || 'Failed to connect with token');
         }
         
-        const data = await response.json();
+        const data = response.data;
         
         console.log('GitHub API response:', data);
         console.log('Repositories loaded:', data.repositories);
@@ -384,14 +384,16 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
       const [owner, repo] = fullName.split('/');
       
       // Gọi API để lấy branches của repository
-      const branchesRes = await api.get(`/github/repos/${owner}/${repo}/branches`);
+      const branchesRes = await api.post(`/github/repos/${owner}/${repo}/branches`, {
+        githubToken: formData.personalAccessToken
+      });
       
-      if (!branchesRes.ok) {
-        const errorData = await branchesRes.json();
+      if (branchesRes.status !== 200) {
+        const errorData = branchesRes.data;
         throw new Error(errorData.message || 'Failed to fetch branches');
       }
       
-      const branches = await branchesRes.json();
+      const branches = branchesRes.data.branches || [];
       const branchNames = (branches || []).map(b => b.name || b);
       
       setFormData(prev => ({ 
@@ -437,7 +439,8 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
         id: Date.now(),
         progress: 0,
         createdAt: new Date().toISOString(),
-        // Note: personalAccessToken is NOT included in project data for security
+        // Include personalAccessToken for secure storage in database
+        personalAccessToken: formData.personalAccessToken || null
       };
       onSubmit(projectData);
       handleReset();

@@ -12,7 +12,6 @@ import ProjectDetail from './pages/ProjectDetail';
 import Profile from './pages/Profile';
 import './App.css';
 import { useEffect } from 'react';
-import { checkOAuthReturn } from './services/auth/oauth';
 import { useTheme } from './contexts/ThemeContext';
 
 function AppInner() {
@@ -21,13 +20,12 @@ function AppInner() {
   const { theme, toggleTheme } = useTheme();
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [pageParams, setPageParams] = useState({});
 
-  const handleNavigate = (page) => {
+  const handleNavigate = (page, params = {}) => {
     setCurrentPage(page);
+    setPageParams(params);
   };
-
-    // No need to check OAuth return on mount with popup approach
-  // OAuth is now handled via popup windows
 
   // Listen for GitHub repos loaded event
   useEffect(() => {
@@ -38,7 +36,7 @@ function AppInner() {
       // Open modal after a short delay to ensure navigation is complete
       setTimeout(() => {
         setShowCreateProject(true);
-        console.log('App: Modal opened after OAuth completion');
+        console.log('App: Modal opened after GitHub repos loaded');
       }, 200);
     };
 
@@ -55,7 +53,7 @@ function AppInner() {
       case 'projects':
         return <ProjectsNew onNavigate={handleNavigate} />;
       case 'project-detail':
-        return <ProjectDetail />;
+        return <ProjectDetail id={pageParams.id || 1} onNavigate={handleNavigate} />;
       case 'profile':
         return <Profile />;
       default:

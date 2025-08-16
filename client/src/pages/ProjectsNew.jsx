@@ -34,7 +34,7 @@ import {
 import CreateProjectStepperModal from '../components/CreateProjectStepperModal';
 import TestReportModal from '../components/TestReportModal';
 import ProjectDetailModal from '../components/ProjectDetailModal';
-import { api } from '../services/auth/apiClient';
+import { projectsService } from '../services/projects';
 
 const ProjectsNew = ({ onNavigate }) => {
   const [projects, setProjects] = useState([]);
@@ -73,19 +73,17 @@ const ProjectsNew = ({ onNavigate }) => {
       setLoading(true);
       setError(null);
       
-      const response = await api.get('/github/projects');
+      const response = await projectsService.getAllProjects();
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to load projects');
+      if (response.success) {
+        setProjects(response.projects);
+      } else {
+        throw new Error('Failed to load projects');
       }
-      
-      const projectsData = await response.json();
-      setProjects(projectsData);
       
     } catch (err) {
       console.error('Failed to load projects:', err);
-      setError(err.message);
+      setError(err.message || 'Failed to load projects');
       // Fallback to empty array
       setProjects([]);
     } finally {
@@ -124,7 +122,7 @@ const ProjectsNew = ({ onNavigate }) => {
 
   const handleCreateProject = async (projectData) => {
     try {
-      const response = await api.post('/github/projects', {
+      const response = await projectsService.createProject({
         name: projectData.name,
         description: projectData.description,
         startDate: projectData.startDate,
@@ -135,26 +133,25 @@ const ProjectsNew = ({ onNavigate }) => {
         gitProvider: projectData.gitProvider || '',
         repository: projectData.repository || projectData.selectedRepository || '',
         branch: projectData.branch || '',
-        notifications: projectData.selectedNotifications || []
+        notifications: projectData.selectedNotifications || [],
+        personalAccessToken: projectData.personalAccessToken || null // Lưu GitHub token
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create project');
+      if (response.success) {
+        const newProject = response.project;
+        
+        setProjects([newProject, ...projects]);
+        setSnackbar({
+          open: true,
+          message: `Project "${newProject.name}" created successfully!`,
+          severity: 'success',
+        });
+        
+        // Reload projects to get fresh data
+        loadProjects();
+      } else {
+        throw new Error('Failed to create project');
       }
-
-      const result = await response.json();
-      const newProject = result.project;
-      
-      setProjects([newProject, ...projects]);
-      setSnackbar({
-        open: true,
-        message: `Project "${newProject.name}" created successfully!`,
-        severity: 'success',
-      });
-      
-      // Reload projects to get fresh data
-      loadProjects();
       
     } catch (err) {
       console.error('Failed to create project:', err);
@@ -168,7 +165,7 @@ const ProjectsNew = ({ onNavigate }) => {
 
   const handleDeleteProject = async (projectId) => {
     try {
-      // TODO: Add delete endpoint
+      await projectsService.deleteProject(projectId);
       setProjects(projects.filter(project => project.id !== projectId));
       setSnackbar({
         open: true,
