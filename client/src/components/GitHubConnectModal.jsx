@@ -18,7 +18,7 @@ import {
   Chip
 } from '@mui/material';
 import { GitHub as GitHubIcon, Visibility, VisibilityOff } from '@mui/icons-material';
-import { githubService } from '../services/github';
+import { gitService } from '../services/git';
 
 const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
   const [token, setToken] = useState('');
@@ -41,7 +41,7 @@ const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
     setError('');
 
     try {
-      const response = await githubService.connectWithToken(token);
+      const response = await gitService.connectWithToken(token);
       setGithubData(response);
       setSuccess(true);
       
@@ -85,7 +85,7 @@ const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
     try {
       // Lấy branches từ GitHub API cho repository cụ thể
       const [owner, repoName] = repo.full_name.split('/');
-      const branchesData = await githubService.getBranches(owner, repoName, token);
+      const branchesData = await gitService.getBranches(owner, repoName, token);
       
       if (branchesData.success && branchesData.branches) {
         setBranches(branchesData.branches);

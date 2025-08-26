@@ -180,7 +180,7 @@ export const openApiSpec = {
           },
           createdAt: { type: 'string', format: 'date-time' },
           isDelete: { type: 'boolean' },
-          isDisable: { type: 'boolean' },
+          isDisabled: { type: 'boolean' },
           status: { type: 'string' }
         }
       },
@@ -878,28 +878,79 @@ export const openApiSpec = {
       }
     },
     
-    // GitHub endpoints
-    '/github/repos': {
-      get: {
-        tags: ['GitHub'],
+    // Git endpoints
+    '/git/repos': {
+      post: {
+        tags: ['Git'],
         summary: 'Danh sách repository của user',
         description: 'Lấy danh sách repositories của user đang đăng nhập',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['token'],
+                properties: {
+                  token: { 
+                    type: 'string', 
+                    description: 'Git Personal Access Token để truy cập repositories'
+                  }
+                }
+              }
+            }
+          }
+        },
         responses: {
           200: { 
             description: 'Danh sách repositories',
             content: {
               'application/json': {
                 schema: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      name: { type: 'string' },
-                      full_name: { type: 'string' },
-                      private: { type: 'boolean' }
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    repositories: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'integer' },
+                          name: { type: 'string' },
+                          full_name: { type: 'string' },
+                          private: { type: 'boolean' },
+                          description: { type: 'string' },
+                          language: { type: 'string' },
+                          updated_at: { type: 'string' },
+                          html_url: { type: 'string' },
+                          clone_url: { type: 'string' },
+                          default_branch: { type: 'string' },
+                          stargazers_count: { type: 'integer' },
+                          forks_count: { type: 'integer' },
+                          open_issues_count: { type: 'integer' },
+                          branches: {
+                            type: 'array',
+                            items: {
+                              type: 'object',
+                              properties: {
+                                name: { type: 'string' },
+                                commitSha: { type: 'string' }
+                              }
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 }
+              }
+            }
+          },
+          400: { 
+            description: 'Bad Request - Token không hợp lệ',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
               }
             }
           },
@@ -910,14 +961,22 @@ export const openApiSpec = {
                 schema: { $ref: '#/components/schemas/ErrorResponse' }
               }
             }
+          },
+          500: { 
+            description: 'Internal Server Error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
           }
         }
       }
     },
     
-    '/github/repos/{owner}/{repo}/branches': {
+    '/git/repos/{owner}/{repo}/branches': {
       post: {
-        tags: ['GitHub'],
+        tags: ['Git'],
         summary: 'Danh sách branch của repository',
         description: 'Lấy danh sách branches của một repository cụ thể',
         parameters: [
@@ -946,7 +1005,7 @@ export const openApiSpec = {
                 properties: {
                   githubToken: { 
                     type: 'string', 
-                    description: 'GitHub Personal Access Token để truy cập repository' 
+                    description: 'Git Personal Access Token để truy cập repository' 
                   }
                 }
               }
@@ -1009,11 +1068,11 @@ export const openApiSpec = {
       }
     },
     
-    '/github/connect-with-token': {
+    '/git/connect-with-token': {
       post: {
-        tags: ['GitHub'],
-        summary: 'Kết nối GitHub bằng Personal Access Token',
-        description: 'Kết nối với GitHub sử dụng Personal Access Token',
+        tags: ['Git'],
+        summary: 'Kết nối Git bằng Personal Access Token',
+        description: 'Kết nối với Git sử dụng Personal Access Token',
         requestBody: {
           required: true,
           content: {

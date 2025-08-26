@@ -302,9 +302,8 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
     try {
       if (formData.gitProvider === 'GitHub') {
         // Gửi token về backend để xác thực và lấy repos
-        const response = await api.post('/github/connect-with-token', {
-          token: formData.personalAccessToken,
-          provider: 'github'
+        const response = await api.post('/git/repos', {
+          token: formData.personalAccessToken
         });
         
         if (response.status !== 200) {
@@ -384,7 +383,7 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
       const [owner, repo] = fullName.split('/');
       
       // Gọi API để lấy branches của repository
-      const branchesRes = await api.post(`/github/repos/${owner}/${repo}/branches`, {
+      const branchesRes = await api.post(`/git/repos/${owner}/${repo}/branches`, {
         githubToken: formData.personalAccessToken
       });
       

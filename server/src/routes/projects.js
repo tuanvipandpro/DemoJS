@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
     let query = `
       SELECT 
         id, name, description, git_provider, repository, branch, 
-        owner_id, personal_access_token, notifications, created_at, is_delete, is_disable, status
+        owner_id, personal_access_token, notifications, created_at, is_delete, is_disabled, status
       FROM projects
       WHERE is_delete = false
     `;
@@ -149,7 +149,7 @@ router.post('/', async (req, res) => {
       notifications: newProject.notifications ? JSON.parse(newProject.notifications) : [],
       createdAt: newProject.created_at,
       isDelete: newProject.is_delete,
-      isDisable: newProject.is_disable,
+      isDisabled: newProject.is_disabled,
       status: newProject.status
     };
     
@@ -174,7 +174,7 @@ router.get('/:id', checkProjectAccess, async (req, res) => {
     const query = `
       SELECT 
         id, name, description, git_provider, repository, branch, 
-        owner_id, personal_access_token, notifications, created_at, is_delete, is_disable, status
+        owner_id, personal_access_token, notifications, created_at, is_delete, is_disabled, status
       FROM projects 
       WHERE id = $1 AND is_delete = false
     `;
@@ -196,7 +196,7 @@ router.get('/:id', checkProjectAccess, async (req, res) => {
       notifications: project.notifications ? JSON.parse(project.notifications) : [],
       createdAt: project.created_at,
       isDelete: project.is_delete,
-      isDisable: project.is_disable,
+      isDisabled: project.is_disabled,
       status: project.status
     };
     
@@ -264,7 +264,7 @@ router.put('/:id', checkProjectAccess, async (req, res) => {
     
     const updatedProject = result.rows[0];
     
-    // Format response - trả về personalAccessToken đã mã hóa
+        // Format response - trả về personalAccessToken đã mã hóa
     const formattedProject = {
       id: updatedProject.id,
       name: updatedProject.name,
@@ -277,10 +277,10 @@ router.put('/:id', checkProjectAccess, async (req, res) => {
       notifications: updatedProject.notifications ? JSON.parse(updatedProject.notifications) : [],
       createdAt: updatedProject.created_at,
       isDelete: updatedProject.is_delete,
-      isDisable: updatedProject.is_disable,
+      isDisabled: updatedProject.is_disabled,
       status: updatedProject.status
     };
-    
+
     res.json({
       success: true,
       project: formattedProject
@@ -319,23 +319,23 @@ router.delete('/:id', checkProjectAccess, async (req, res) => {
 router.patch('/:id/disable', checkProjectAccess, async (req, res) => {
   try {
     const { id } = req.params;
-    const { isDisable } = req.body;
+    const { isDisabled } = req.body;
     
-    if (typeof isDisable !== 'boolean') {
+    if (typeof isDisabled !== 'boolean') {
       return res.status(400).json({
         success: false,
-        error: 'isDisable must be a boolean value'
+        error: 'isDisabled must be a boolean value'
       });
     }
     
     const query = `
       UPDATE projects 
-      SET is_disable = $2 
+      SET is_disabled = $2 
       WHERE id = $1 AND is_delete = false
       RETURNING *
     `;
     
-    const result = await pool.query(query, [id, isDisable]);
+    const result = await pool.query(query, [id, isDisabled]);
     
     const updatedProject = result.rows[0];
     
@@ -352,7 +352,7 @@ router.patch('/:id/disable', checkProjectAccess, async (req, res) => {
       notifications: updatedProject.notifications ? JSON.parse(updatedProject.notifications) : [],
       createdAt: updatedProject.created_at,
       isDelete: updatedProject.is_delete,
-      isDisable: updatedProject.is_disable,
+      isDisabled: updatedProject.is_disabled,
       status: updatedProject.status
     };
     
@@ -406,7 +406,7 @@ router.patch('/:id/status', checkProjectAccess, async (req, res) => {
       notifications: updatedProject.notifications ? JSON.parse(updatedProject.notifications) : [],
       createdAt: updatedProject.created_at,
       isDelete: updatedProject.is_delete,
-      isDisable: updatedProject.is_disable,
+      isDisabled: updatedProject.is_disabled,
       status: updatedProject.status
     };
     

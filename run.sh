@@ -15,10 +15,22 @@ while ! docker ps --filter "name=postgres" --format '{{.Status}}' | grep -q 'hea
   sleep 1 # Wait for 1 second before checking again
 done
 
-echo "Docker containers are ready. Starting backend and frontend..."
+echo "Docker containers are ready. Installing dependencies..."
+
+# Install backend dependencies
+echo "Installing backend dependencies..."
+cd server
+npm install
+
+# Install frontend dependencies
+echo "Installing frontend dependencies..."
+cd ../client
+npm install
+
+echo "Dependencies installed. Starting backend and frontend..."
 
 # Start backend in the background and capture its Process ID (PID)
-cd server
+cd ../server
 npm run dev &
 BACKEND_PID=$!
 

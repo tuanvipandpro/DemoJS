@@ -21,17 +21,108 @@ const authenticateJWT = async (req, res, next) => {
   }
 };
 
-// GET /api/github/repos - Lấy danh sách repository của user
-router.get('/repos', authenticateJWT, async (req, res) => {
+
+
+// POST /api/git/repos - Lấy danh sách repository của user
+router.post('/repos', authenticateJWT, async (req, res) => {
   try {
-    // TODO: This endpoint should use stored GitHub token from user's profile
-    // For now, return error asking user to connect first
-    res.status(400).json({
-      error: 'GitHub not connected',
-      message: 'Please connect your GitHub account first using /connect-with-token endpoint'
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({
+        error: 'Git token required',
+        message: 'Please provide Git token in request body'
+      });
+    }
+    
+    // Call GitHub API to get user repositories
+    const reposResponse = await fetch('https://api.github.com/user/repos?sort=updated&per_page=100', {
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'InsightTestAI'
+      }
     });
+    
+    if (!reposResponse.ok) {
+      logger.error('Git API repos error:', {
+        status: reposResponse.status,
+        statusText: reposResponse.statusText
+      });
+      return res.status(500).json({
+        error: 'Failed to fetch repositories',
+        message: 'Unable to fetch repositories from Git'
+      });
+    }
+    
+    const repos = await reposResponse.json();
+    
+    // Transform repositories to match our expected format
+    const transformedRepos = repos.map(repo => ({
+      id: repo.id,
+      name: repo.name,
+      full_name: repo.full_name,
+      private: repo.private,
+      description: repo.description,
+      language: repo.language,
+      updated_at: repo.updated_at,
+      html_url: repo.html_url,
+      clone_url: repo.clone_url,
+      default_branch: repo.default_branch,
+      stargazers_count: repo.stargazers_count,
+      forks_count: repo.forks_count,
+      open_issues_count: repo.open_issues_count
+    }));
+
+    // Lấy branches cho mỗi repository (chỉ lấy 5 repositories đầu tiên để tránh rate limit)
+    const reposWithBranches = [];
+    for (let i = 0; i < Math.min(transformedRepos.length, 5); i++) {
+      const repo = transformedRepos[i];
+      try {
+        const [owner, repoName] = repo.full_name.split('/');
+        const branchesResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/branches`, {
+          headers: {
+            'Authorization': `token ${token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'User-Agent': 'InsightTestAI'
+          }
+        });
+        
+        if (branchesResponse.ok) {
+          const branches = await branchesResponse.json();
+          repo.branches = branches.map(branch => ({
+            name: branch.name,
+            commitSha: branch.commit.sha
+          }));
+          logger.info(`Successfully fetched ${repo.branches.length} branches for ${repo.full_name}`);
+        } else {
+          logger.warn(`Failed to fetch branches for ${repo.full_name}:`, {
+            status: branchesResponse.status,
+            statusText: branchesResponse.statusText
+          });
+          repo.branches = [];
+        }
+      } catch (error) {
+        logger.error(`Error fetching branches for ${repo.full_name}:`, error);
+        repo.branches = [];
+      }
+      reposWithBranches.push(repo);
+    }
+    
+    const response = {
+      success: true,
+      repositories: reposWithBranches
+    };
+    
+    // Log successful response
+    logger.info('Git repos fetched successfully:', {
+      userId: req.user.sub,
+      reposCount: transformedRepos.length
+    });
+    
+    res.json(response);
   } catch (error) {
-    logger.error('Error fetching GitHub repos:', error);
+    logger.error('Error fetching Git repos:', error);
     res.status(500).json({
       error: 'Failed to fetch repositories',
       message: error.message || 'Internal server error'
@@ -39,14 +130,14 @@ router.get('/repos', authenticateJWT, async (req, res) => {
   }
 });
 
-// GET /api/github/repos/{owner}/{repo}/branches - Lấy danh sách branch của repository
+// GET /api/git/repos/{owner}/{repo}/branches - Lấy danh sách branch của repository
 router.post('/repos/:owner/:repo/branches', authenticateJWT, async (req, res) => {
   try {
     const { owner, repo } = req.params;
     const { githubToken } = req.body;
     
     // Log request for debugging
-    logger.info('GitHub branches request:', {
+    logger.info('Git branches request:', {
       userId: req.user.sub,
       owner,
       repo,
@@ -56,8 +147,8 @@ router.post('/repos/:owner/:repo/branches', authenticateJWT, async (req, res) =>
     // Validation
     if (!githubToken) {
       return res.status(400).json({
-        error: 'GitHub token is required',
-        message: 'Please provide GitHub token to fetch branches'
+        error: 'Git token is required',
+        message: 'Please provide Git token to fetch branches'
       });
     }
     
@@ -71,7 +162,7 @@ router.post('/repos/:owner/:repo/branches', authenticateJWT, async (req, res) =>
     });
     
     if (!branchesResponse.ok) {
-      logger.error('GitHub API branches error:', {
+      logger.error('Git API branches error:', {
         status: branchesResponse.status,
         statusText: branchesResponse.statusText,
         owner,
@@ -87,7 +178,7 @@ router.post('/repos/:owner/:repo/branches', authenticateJWT, async (req, res) =>
       
       return res.status(branchesResponse.status).json({
         error: 'Failed to fetch branches',
-        message: `GitHub API error: ${branchesResponse.statusText}`
+        message: `Git API error: ${branchesResponse.statusText}`
       });
     }
     
@@ -98,26 +189,18 @@ router.post('/repos/:owner/:repo/branches', authenticateJWT, async (req, res) =>
       name: branch.name,
       commitSha: branch.commit.sha,
       commitUrl: branch.commit.url,
-      protection: branch.protection
+      commitMessage: branch.commit.commit?.message || '',
+      commitAuthor: branch.commit.commit?.author?.name || '',
+      commitDate: branch.commit.commit?.author?.date || ''
     }));
-    
-    // Log successful response
-    logger.info('GitHub branches fetched successfully:', {
-      userId: req.user.sub,
-      owner,
-      repo,
-      branchesCount: transformedBranches.length
-    });
-    
+
     res.json({
       success: true,
       repository: `${owner}/${repo}`,
-      branches: transformedBranches,
-      total: transformedBranches.length
+      branches: transformedBranches
     });
-    
   } catch (error) {
-    logger.error('Error fetching GitHub branches:', error);
+    logger.error('Error fetching Git branches:', error);
     res.status(500).json({
       error: 'Failed to fetch branches',
       message: error.message || 'Internal server error'
@@ -125,13 +208,13 @@ router.post('/repos/:owner/:repo/branches', authenticateJWT, async (req, res) =>
   }
 });
 
-// POST /api/github/connect-with-token - Kết nối GitHub bằng Personal Access Token
+// POST /api/git/connect-with-token - Kết nối Git bằng Personal Access Token
 router.post('/connect-with-token', authenticateJWT, async (req, res) => {
   try {
     const { token, provider } = req.body;
     
     // Log request for debugging
-    logger.info('GitHub connect request:', {
+    logger.info('Git connect request:', {
       userId: req.user.sub,
       provider,
       hasToken: !!token,
@@ -141,7 +224,7 @@ router.post('/connect-with-token', authenticateJWT, async (req, res) => {
     // Validation
     if (!token) {
       return res.status(400).json({
-        error: 'GitHub token is required'
+        error: 'Git token is required'
       });
     }
     
@@ -154,7 +237,7 @@ router.post('/connect-with-token', authenticateJWT, async (req, res) => {
     // Validate token format (GitHub tokens are typically 40 characters)
     if (token.length < 20) {
       return res.status(400).json({
-        error: 'Invalid GitHub token format'
+        error: 'Invalid Git token format'
       });
     }
     
@@ -168,13 +251,13 @@ router.post('/connect-with-token', authenticateJWT, async (req, res) => {
     });
     
     if (!userResponse.ok) {
-      logger.error('GitHub API user error:', {
+      logger.error('Git API user error:', {
         status: userResponse.status,
         statusText: userResponse.statusText
       });
       return res.status(401).json({
-        error: 'Invalid GitHub token',
-        message: 'Unable to authenticate with GitHub'
+        error: 'Invalid Git token',
+        message: 'Unable to authenticate with Git'
       });
     }
     
@@ -190,13 +273,13 @@ router.post('/connect-with-token', authenticateJWT, async (req, res) => {
     });
     
     if (!reposResponse.ok) {
-      logger.error('GitHub API repos error:', {
+      logger.error('Git API repos error:', {
         status: reposResponse.status,
         statusText: reposResponse.statusText
       });
       return res.status(500).json({
         error: 'Failed to fetch repositories',
-        message: 'Unable to fetch repositories from GitHub'
+        message: 'Unable to fetch repositories from Git'
       });
     }
     
@@ -274,17 +357,17 @@ router.post('/connect-with-token', authenticateJWT, async (req, res) => {
     };
     
     // Log successful response
-    logger.info('GitHub connect successful:', {
+    logger.info('Git connect successful:', {
       userId: req.user.sub,
-      githubUser: user.login,
+      gitUser: user.login,
       reposCount: transformedRepos.length
     });
     
     res.json(response);
   } catch (error) {
-    logger.error('Error connecting to GitHub:', error);
+    logger.error('Error connecting to Git:', error);
     res.status(500).json({
-      error: 'Failed to connect to GitHub',
+      error: 'Failed to connect to Git',
       message: error.message || 'Internal server error'
     });
   }

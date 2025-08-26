@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Drawer,
   List,
@@ -30,6 +30,16 @@ const menuItems = [
 
 const Sidebar = ({ open, onClose, onNavigate }) => {
   const { mode, toggleTheme } = useTheme();
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Cập nhật thời gian mỗi giây
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const handleNavigation = (path) => {
     console.log('Navigate to:', path);
@@ -40,6 +50,28 @@ const Sidebar = ({ open, onClose, onNavigate }) => {
         onNavigate('projects');
       }
     }
+  };
+
+  const handleLogoClick = () => {
+    // Khi click vào logo, quay về dashboard
+    handleNavigation('/');
+  };
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('vi-VN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
   };
 
   return (
@@ -58,7 +90,16 @@ const Sidebar = ({ open, onClose, onNavigate }) => {
     >
       <Toolbar>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
-          <Logo size="small" />
+          <Box 
+            onClick={handleLogoClick}
+            sx={{ 
+              cursor: 'pointer',
+              '&:hover': { opacity: 0.8 },
+              transition: 'opacity 0.2s'
+            }}
+          >
+            <Logo size="small" />
+          </Box>
           <Typography variant="h6" noWrap component="div">
             InsightTestAI
           </Typography>
@@ -83,6 +124,12 @@ const Sidebar = ({ open, onClose, onNavigate }) => {
       <Divider />
       <Box sx={{ p: 2, textAlign: 'center' }}>
         <Typography variant="caption" color="textSecondary" display="block">
+          {formatTime(currentTime)}
+        </Typography>
+        <Typography variant="caption" color="textSecondary" display="block">
+          {formatDate(currentTime)}
+        </Typography>
+        <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 1 }}>
           Version 1.0.0
         </Typography>
         <Typography variant="caption" color="textSecondary" display="block">
