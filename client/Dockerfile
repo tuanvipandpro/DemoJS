@@ -15,5 +15,5 @@ COPY . .
 # Expose port
 EXPOSE 5173
 
-# Start command với development mode
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Start command với development mode và host 0.0.0.0 để có thể access từ bên ngoài container
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
