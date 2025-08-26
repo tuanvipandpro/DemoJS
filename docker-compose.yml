@@ -6,9 +6,9 @@ services:
     container_name: postgres-vector-db
     restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-insighttestai}
-      POSTGRES_USER: ${POSTGRES_USER:-insight}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-insight}
+      POSTGRES_DB: ${DB_NAME:-insighttestai}
+      POSTGRES_USER: ${DB_USER:-insight}
+      POSTGRES_PASSWORD: ${DB_PASS:-insightp}
     ports:
       - "5432:5432"
     volumes:
@@ -18,68 +18,3 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # networks:
-    #   - insighttestai-network
-
-#   backend:
-#     build:
-#       context: ./server
-#       dockerfile: Dockerfile
-#     container_name: insighttestai-backend
-#     restart: always
-#     environment:
-#       - NODE_ENV=production
-#       - PORT=3001
-#       - HOST=0.0.0.0
-#       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173}
-#       - TRUST_PROXY=${TRUST_PROXY:-0}
-#       - DB_USER=${DB_USER:-insight}
-#       - DB_PASS=${DB_PASS:-insight}
-#       - DB_HOST=postgres
-#       - DB_PORT=5432
-#       - DB_NAME=${DB_NAME:-insighttestai}
-#       - PG_POOL_MAX=${PG_POOL_MAX:-10}
-#       - PG_IDLE_TIMEOUT_MS=${PG_IDLE_TIMEOUT_MS:-30000}
-#       - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key_here}
-#       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-1h}
-#       - SESSION_SECRET=${SESSION_SECRET:-your_session_secret_here}
-#       - SESSION_MAXAGE_MS=${SESSION_MAXAGE_MS:-86400000}
-#       - COOKIE_SECURE=${COOKIE_SECURE:-0}
-#       - COOKIE_SAMESITE=${COOKIE_SAMESITE:-lax}
-#       - LOG_LEVEL=${LOG_LEVEL:-info}
-#     ports:
-#       - "3001:3001"
-#     depends_on:
-#       postgres:
-#         condition: service_healthy
-#     networks:
-#       - insighttestai-network
-#     volumes:
-#       - ./server:/app
-#       - /app/node_modules
-
-#   frontend:
-#     build:
-#       context: ./client
-#       dockerfile: Dockerfile
-#     container_name: insighttestai-frontend
-#     restart: always
-#     environment:
-#       - NODE_ENV=development
-#       - VITE_API_BASE_URL=http://localhost:3001
-#       - VITE_API_PROXY_TARGET=http://backend:3001
-#     ports:
-#       - "5173:5173"
-#     depends_on:
-#       - backend
-#     networks:
-#       - insighttestai-network
-#     volumes:
-#       - .:/app
-#       - /app/node_modules
-#       - /app/server/node_modules
-#     command: npm run dev -- --host 0.0.0.0
-
-# networks:
-#   insighttestai-network:
-#     driver: bridge

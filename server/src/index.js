@@ -1,13 +1,9 @@
 import './config/env.js';
 import express from 'express';
-import session from 'express-session';
 import cors from 'cors';
 import helmet from 'helmet';
-import passport from 'passport';
 
-import { sessionConfig } from './config/session.js';
-import './auth/passport.js';
-import { initDatabase } from './db/init.js';
+import { initializeDatabase } from './db/init.js';
 
 import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.js';
@@ -62,9 +58,6 @@ if (process.env.TRUST_PROXY === '1') {
   app.set('trust proxy', 1);
 }
 
-app.use(session(sessionConfig));
-app.use(passport.initialize());
-app.use(passport.session());
 app.use(httpLogger);
 
 app.use('/api/health', healthRouter);
@@ -82,7 +75,7 @@ app.get('/', (_req, res) => {
 const port = Number(process.env.PORT || 3001);
 const host = process.env.HOST || '0.0.0.0';
 
-initDatabase()
+initializeDatabase()
   .then(() => {
     app.listen(port, host, () => {
       const displayHost = host === '0.0.0.0' ? 'localhost' : host;

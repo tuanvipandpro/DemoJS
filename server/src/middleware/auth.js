@@ -1,63 +1,18 @@
 import { extractBearerToken, verifyToken } from '../utils/jwt.js';
-import { pool } from '../db/init.js';
-import { logger } from '../utils/logger.js';
 
-/**
- * Middleware để xác thực JWT token và set req.user
- */
-export async function authenticateJWT(req, res, next) {
+export function ensureAuthenticated(req, res, next) {
+  // JWT-based authentication only
   try {
     const token = extractBearerToken(req);
-    
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        error: 'No token provided'
-      });
-    }
-
-    try {
-      // Verify JWT token
+    if (token) {
       const payload = verifyToken(token);
-      
-      // Fetch user từ database để lấy thông tin đầy đủ
-      const result = await pool.query(
-        `SELECT id, username, email, display_name FROM users WHERE id = $1`,
-        [payload.sub]
-      );
-      
-      if (result.rows.length === 0) {
-        return res.status(401).json({
-          success: false,
-          error: 'User not found'
-        });
-      }
-      
-      const user = result.rows[0];
-      
-      // Set user vào request
-      req.user = {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        displayName: user.display_name
-      };
-      
-      next();
-    } catch (jwtError) {
-      logger.error('JWT verification failed:', jwtError);
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid or expired token'
-      });
+      req.user = { id: payload.sub, username: payload.username, provider: 'jwt' };
+      return next();
     }
   } catch (error) {
-    logger.error('Authentication middleware error:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Authentication failed'
-    });
+    return res.status(401).json({ error: 'Invalid token' });
   }
+  return res.status(401).json({ error: 'Unauthorized - No valid token provided' });
 }
 
 /**

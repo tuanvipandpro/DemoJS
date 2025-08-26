@@ -1,82 +1,85 @@
 # InsightTestAI Server
 
-## Cài đặt
+Server backend cho ứng dụng InsightTestAI, cung cấp API cho authentication, project management và AI testing.
 
-1. Cài đặt dependencies:
+## Features
+
+- JWT-based authentication
+- User management (register, login, profile)
+- Project management
+- GitHub integration (Personal Access Token)
+- Vector database integration
+- Swagger API documentation
+
+## Environment Variables
+
+```bash
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=insighttestai
+DB_USER=insight
+DB_PASS=insight
+
+# JWT
+JWT_SECRET=your_jwt_secret_here
+JWT_ACCESS_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+
+# Server
+PORT=3001
+HOST=0.0.0.0
+TRUST_PROXY=0
+
+# CORS
+CORS_ORIGIN=http://localhost:5173
+
+# Cookie (if needed)
+COOKIE_SAMESITE=lax
+COOKIE_SECURE=0
+```
+
+## Installation
+
+1. Install dependencies:
 ```bash
 npm install
 ```
 
-2. Tạo file `.env` với cấu hình sau:
+2. Set up environment variables (see above)
 
-```env
-# Server Configuration
-PORT=3001
-HOST=0.0.0.0
-CORS_ORIGIN=http://localhost:5173
-TRUST_PROXY=0
-
-# Database Configuration
-DB_USER=your_db_username
-DB_PASS=your_db_password
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=insighttestai
-
-# Database Pool Configuration
-PG_POOL_MAX=10
-PG_IDLE_TIMEOUT_MS=30000
-
-# JWT Configuration
-JWT_SECRET=your_jwt_secret_key_here
-JWT_EXPIRES_IN=1h
-
-# Session Configuration
-SESSION_SECRET=your_session_secret_here
-
-# Logging
-LOG_LEVEL=info
-```
-
-## Chạy server
-
-Development mode:
+3. Start the server:
 ```bash
-npm run dev
+npm run dev  # Development mode
+npm start    # Production mode
 ```
 
-Production mode:
-```bash
-npm start
-```
+## API Documentation
 
-## Cấu hình Database
+Swagger UI available at `/api/docs` when server is running.
 
-Server sử dụng PostgreSQL với các biến môi trường riêng lẻ:
+## Database Schema
 
-- `DB_USER`: Tên người dùng database
-- `DB_PASS`: Mật khẩu database  
-- `DB_HOST`: Host database (mặc định: localhost)
-- `DB_PORT`: Port database (mặc định: 5432)
-- `DB_NAME`: Tên database (mặc định: insighttestai)
+The server will automatically create required tables on startup:
+- `users` - User accounts
+- `refresh_tokens` - JWT refresh tokens
+- `projects` - User projects
+- `sessions` - No longer used (removed)
 
-## API Endpoints
+## Authentication Flow
 
-- `GET /api/health` - Health check
-- `POST /api/auth/register` - Đăng ký người dùng
-- `POST /api/auth/login` - Đăng nhập
-- `GET /api/auth/me` - Lấy thông tin người dùng hiện tại
-- `GET /api/auth/profile` - Lấy profile người dùng
-- `PUT /api/auth/profile` - Cập nhật profile
-- `POST /api/auth/logout` - Đăng xuất
-- `POST /api/auth/token/refresh` - Làm mới token
-- `GET /api/vectors` - Vector operations
-- `GET /api/docs` - Swagger UI documentation
+1. **Register**: POST `/api/auth/register`
+2. **Login**: POST `/api/auth/login` → returns access_token + refresh_token
+3. **API calls**: Include `Authorization: Bearer <access_token>` header
+4. **Refresh**: POST `/api/auth/token/refresh` when access token expires
+5. **Logout**: POST `/api/auth/logout` (client removes tokens)
 
-## Lưu ý
+## Security Features
 
-- Server không còn sử dụng GitHub OAuth
-- Tất cả authentication đều thông qua local username/password
-- Database sẽ tự động được khởi tạo khi server khởi động
+- JWT tokens with configurable expiration
+- Refresh token rotation
+- bcrypt password hashing
+- CORS protection
+- Helmet security headers
 
 

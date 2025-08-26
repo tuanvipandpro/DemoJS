@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import passport from 'passport';
 import { logger } from '../utils/logger.js';
 import bcrypt from 'bcryptjs';
 import { pool } from '../db/init.js';
@@ -10,10 +9,7 @@ import { verifyLocalUser, registerLocalUser } from '../auth/providers/localProvi
 const router = Router();
 
 router.get('/me', async (req, res) => {
-  if (req.isAuthenticated && req.isAuthenticated()) {
-    return res.json({ user: req.user });
-  }
-  // Try JWT bearer
+  // JWT-based authentication only
   try {
     const token = extractBearerToken(req);
     if (token) {
@@ -84,14 +80,10 @@ router.put('/profile', async (req, res) => {
   }
 });
 
-router.post('/logout', (req, res, next) => {
-  req.logout((err) => {
-    if (err) return next(err);
-    req.session.destroy(() => {
-      res.clearCookie('connect.sid');
-      res.json({ ok: true });
-    });
-  });
+router.post('/logout', (req, res) => {
+  // JWT tokens are stateless, so logout is handled client-side
+  // Client should remove tokens from storage
+  res.json({ ok: true, message: 'Logout successful. Please remove tokens from client storage.' });
 });
 
 // Password-based auth

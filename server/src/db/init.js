@@ -1,148 +1,200 @@
-import '../config/env.js';
 import pkg from 'pg';
-
 const { Pool } = pkg;
+import { logger } from '../utils/logger.js';
 
-// Cấu hình database từ các biến môi trường riêng lẻ
-const dbConfig = {
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT) || 5432,
-  database: process.env.DB_NAME || 'insight',
-  max: Number(process.env.PG_POOL_MAX || 10),
-  idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT_MS || 30000),
-};
+// Tạo kết nối PostgreSQL pool
+export const pool = new Pool({
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'insighttestai',
+  password: process.env.DB_PASS || 'postgres',
+  port: process.env.DB_PORT || 5432,
+  max: process.env.PG_POOL_MAX || 20, // maximum number of connections in the pool
+  idleTimeoutMillis: process.env.PG_IDLE_TIMEOUT_MS || 30000, // close idle clients after 30 seconds
+  connectionTimeoutMillis: 2000, // return an error after 2 seconds if connection could not be established
+});
 
-export const pool = new Pool(dbConfig);
+// Event listeners for pool
+pool.on('connect', () => {
+  logger.info('Connected to PostgreSQL database');
+});
 
-export async function initDatabase() {
-  const client = await pool.connect();
+pool.on('error', (err) => {
+  logger.error('Unexpected error on idle client', err);
+  process.exit(-1);
+});
+
+// Function to initialize database tables
+export async function initializeDatabase() {
   try {
-    // Enable pgvector extension and create table
-    await client.query(`CREATE EXTENSION IF NOT EXISTS vector;`);
-    await client.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
-    await client.query(`CREATE EXTENSION IF NOT EXISTS pgjwt;`).catch(() => {});
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS documents (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        namespace TEXT NOT NULL,
-        content TEXT NOT NULL,
-        embedding VECTOR(1536) NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
-    `);
+    // Enable pgvector extension
+    await pool.query('CREATE EXTENSION IF NOT EXISTS vector');
 
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS documents_namespace_idx ON documents (namespace);
-    `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS documents_embedding_idx ON documents USING ivfflat (embedding vector_l2_ops);
-    `);
-    await client.query(`
+    // Create users table if not exists
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        username TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        display_name TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-      );
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255),
+        password_hash VARCHAR(255) NOT NULL,
+        display_name VARCHAR(255),
+        phone VARCHAR(20),
+        address TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
     `);
 
-    // Add email column if missing and ensure uniqueness when not null
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;`);
-    await client.query(
-      `CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx ON users (email) WHERE email IS NOT NULL;`
-    );
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT;`);
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT;`);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS user_provider_tokens (
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        provider TEXT NOT NULL,
-        access_token TEXT NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        PRIMARY KEY (user_id, provider)
-      );
-    `);
-
-    // Add updated_at column if it doesn't exist (for existing installations)
-    await client.query(`
-      ALTER TABLE user_provider_tokens 
-      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS refresh_tokens (
-        token TEXT PRIMARY KEY,
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        expires_at TIMESTAMPTZ NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        revoked BOOLEAN NOT NULL DEFAULT false
-      );
-    `);
-
-    await client.query(`
+    // Create projects table if not exists
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS projects (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name TEXT NOT NULL,
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
         description TEXT,
-        git_provider TEXT,
-        personal_access_token TEXT,
-        repository TEXT,
-        branch TEXT,
-        owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        notifications TEXT DEFAULT '[]',
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        is_delete BOOLEAN DEFAULT false,
-        is_disable BOOLEAN DEFAULT false,
-        status TEXT DEFAULT 'active'
-      );
+        repository_url VARCHAR(500),
+        status VARCHAR(50) DEFAULT 'active',
+        user_id INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_disabled BOOLEAN DEFAULT FALSE
+      )
     `);
 
-    // Add indexes for better performance
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS projects_owner_id_idx ON projects(owner_id);
+    // Create tokens table if not exists (for refresh tokens)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        token_hash VARCHAR(255) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
     `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS projects_status_idx ON projects(status);
+
+    // Create refresh_tokens table if not exists (for JWT refresh tokens)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS refresh_tokens (
+        id SERIAL PRIMARY KEY,
+        token VARCHAR(512) NOT NULL UNIQUE,
+        user_id INTEGER REFERENCES users(id),
+        revoked BOOLEAN DEFAULT FALSE,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
     `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS projects_created_at_idx ON projects(created_at);
+
+    // Create vector documents table if not exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS documents (
+        id SERIAL PRIMARY KEY,
+        namespace VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        embedding vector(1536),
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
     `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS projects_is_delete_idx ON projects(is_delete);
+
+    // Create index for vector similarity search (only if table is newly created)
+    const indexExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE indexname = 'documents_embedding_idx'
+      )
     `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS projects_is_disable_idx ON projects(is_disable);
+    
+    if (!indexExists.rows[0].exists) {
+      await pool.query(`
+        CREATE INDEX documents_embedding_idx 
+        ON documents USING ivfflat (embedding vector_cosine_ops) 
+        WITH (lists = 100)
+      `);
+    }
+
+    // Create index for namespace filtering
+    const namespaceIndexExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE indexname = 'documents_namespace_idx'
+      )
     `);
-  } finally {
-    client.release();
+    
+    if (!namespaceIndexExists.rows[0].exists) {
+      await pool.query(`
+        CREATE INDEX documents_namespace_idx 
+        ON documents (namespace)
+      `);
+    }
+
+    logger.info('Database tables initialized successfully');
+  } catch (error) {
+    logger.error('Error initializing database:', error);
+    throw error;
   }
 }
 
-export async function insertDocument({ namespace, content, embedding }) {
-  const embeddingStr = Array.isArray(embedding) ? `[${embedding.join(',')}]` : String(embedding);
-  const result = await pool.query(
-    `INSERT INTO documents (namespace, content, embedding) VALUES ($1, $2, $3::vector) RETURNING id`,
-    [namespace, content, embeddingStr]
-  );
-  return result.rows[0];
+// Vector operations
+export async function insertDocument({ namespace, content, embedding, metadata = {} }) {
+  try {
+    const result = await pool.query(
+      `INSERT INTO documents (namespace, content, embedding, metadata)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, namespace, content, metadata, created_at`,
+      [namespace, content, JSON.stringify(embedding), metadata]
+    );
+    return result.rows[0];
+  } catch (error) {
+    logger.error('Error inserting document:', error);
+    throw error;
+  }
 }
 
 export async function searchDocuments({ namespace, embedding, limit = 5 }) {
-  const embeddingStr = Array.isArray(embedding) ? `[${embedding.join(',')}]` : String(embedding);
-  const result = await pool.query(
-    `SELECT id, namespace, content, 1 - (embedding <#> $1::vector) AS similarity
-     FROM documents
-     WHERE namespace = $2
-     ORDER BY embedding <-> $1::vector
-     LIMIT $3`,
-    [embeddingStr, namespace, limit]
-  );
-  return result.rows;
+  try {
+    const result = await pool.query(
+      `SELECT id, namespace, content, metadata, 
+              (embedding <=> $2::vector) as distance,
+              created_at
+       FROM documents 
+       WHERE namespace = $1
+       ORDER BY embedding <=> $2::vector
+       LIMIT $3`,
+      [namespace, JSON.stringify(embedding), limit]
+    );
+    return result.rows;
+  } catch (error) {
+    logger.error('Error searching documents:', error);
+    throw error;
+  }
 }
 
+export async function deleteDocument(id) {
+  try {
+    const result = await pool.query(
+      'DELETE FROM documents WHERE id = $1 RETURNING id',
+      [id]
+    );
+    return result.rowCount > 0;
+  } catch (error) {
+    logger.error('Error deleting document:', error);
+    throw error;
+  }
+}
 
+export async function getDocumentsByNamespace(namespace, limit = 100) {
+  try {
+    const result = await pool.query(
+      `SELECT id, namespace, content, metadata, created_at
+       FROM documents 
+       WHERE namespace = $1
+       ORDER BY created_at DESC
+       LIMIT $2`,
+      [namespace, limit]
+    );
+    return result.rows;
+  } catch (error) {
+    logger.error('Error getting documents:', error);
+    throw error;
+  }
+}

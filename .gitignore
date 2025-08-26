@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Database data directory (PostgreSQL)
+db/data/
+/db/

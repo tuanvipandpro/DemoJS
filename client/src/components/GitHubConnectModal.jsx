@@ -33,7 +33,7 @@ const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
 
   const handleConnect = async () => {
     if (!token.trim()) {
-      setError('Vui lòng nhập Personal Access Token');
+      setError('Please enter Personal Access Token');
       return;
     }
 
@@ -51,7 +51,7 @@ const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
       }
     } catch (error) {
       console.error('GitHub connect error:', error);
-      setError(error.response?.data?.error || error.response?.data?.message || 'Không thể kết nối với GitHub');
+      setError(error.response?.data?.error || error.response?.data?.message || 'Unable to connect to GitHub');
     } finally {
       setLoading(false);
     }
@@ -106,7 +106,7 @@ const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
       <DialogTitle>
         <Box display="flex" alignItems="center" gap={1}>
           <GitHubIcon color="primary" />
-          <Typography variant="h6">Kết nối GitHub Repository</Typography>
+          <Typography variant="h6">Connect GitHub Repository</Typography>
         </Box>
       </DialogTitle>
       
@@ -114,22 +114,22 @@ const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
         {!success ? (
           <>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Để kết nối với GitHub, bạn cần cung cấp Personal Access Token. 
-              Token này sẽ được sử dụng để truy cập repository của bạn.
+              To connect with GitHub, you need to provide a Personal Access Token. 
+              This token will be used to access your repositories.
             </Typography>
             
             <Box sx={{ mb: 2 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Cách tạo Personal Access Token:
+                How to create a Personal Access Token:
               </Typography>
               <Typography variant="body2" component="div" sx={{ pl: 2 }}>
-                1. Vào GitHub.com → Settings → Developer settings → Personal access tokens → Tokens (classic)
+                1. Go to GitHub.com → Settings → Developer settings → Personal access tokens → Tokens (classic)
                 <br />
                 2. Click "Generate new token (classic)"
                 <br />
-                3. Chọn scopes: <strong>repo</strong> (để truy cập private repositories)
+                3. Select scopes: <strong>repo</strong> (to access private repositories)
                 <br />
-                4. Copy token và paste vào ô bên dưới
+                4. Copy the token and paste it in the field below
               </Typography>
             </Box>
 
@@ -140,7 +140,7 @@ const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
               value={token}
               onChange={(e) => setToken(e.target.value)}
               placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-              helperText="Token bắt đầu với 'ghp_' và có độ dài khoảng 40 ký tự"
+              helperText="Token starts with 'ghp_' and is about 40 characters long"
               InputProps={{
                 endAdornment: (
                   <Button
@@ -148,7 +148,7 @@ const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
                     startIcon={showToken ? <VisibilityOff /> : <Visibility />}
                     size="small"
                   >
-                    {showToken ? 'Ẩn' : 'Hiện'}
+                    {showToken ? 'Hide' : 'Show'}
                   </Button>
                 )
               }}
@@ -164,13 +164,13 @@ const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
         ) : (
           <Box>
             <Alert severity="success" sx={{ mb: 2 }}>
-              Kết nối GitHub thành công!
+              GitHub connection successful!
             </Alert>
             
             {githubData?.user && (
               <Box sx={{ mb: 3 }}>
                 <Typography variant="h6" sx={{ mb: 2 }}>
-                  Thông tin GitHub User
+                  GitHub User Information
                 </Typography>
                 <Box display="flex" alignItems="center" gap={2}>
                   <Avatar src={githubData.user.avatar_url} sx={{ width: 64, height: 64 }} />
@@ -254,22 +254,22 @@ const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
                 </List>
                 {githubData.repositories.length > 10 && (
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Hiển thị 10 repositories đầu tiên trong tổng số {githubData.repositories.length}
+                    Showing first 10 of {githubData.repositories.length} repositories
                   </Typography>
                 )}
 
-                                 {/* Hiển thị branches của repository được chọn */}
+                                 {/* Display branches of selected repository */}
                  {selectedRepo && (
                    <Box sx={{ mt: 3 }}>
                      <Typography variant="h6" sx={{ mb: 2 }}>
-                       Branches của {selectedRepo.name}
+                       Branches of {selectedRepo.name}
                      </Typography>
                      
                      {loadingBranches ? (
                        <Box display="flex" justifyContent="center" alignItems="center" p={3}>
                          <CircularProgress size={24} />
                          <Typography variant="body2" sx={{ ml: 2 }}>
-                           Đang tải branches...
+                           Loading branches...
                          </Typography>
                        </Box>
                      ) : branches.length > 0 ? (
@@ -327,7 +327,7 @@ const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
                        </List>
                      ) : (
                        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', p: 2 }}>
-                         Không có branches nào
+                         No branches available
                        </Typography>
                      )}
                    </Box>
@@ -342,7 +342,7 @@ const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
         {!success ? (
           <>
             <Button onClick={handleClose} disabled={loading}>
-              Hủy
+              Cancel
             </Button>
             <Button
               onClick={handleConnect}
@@ -350,12 +350,12 @@ const GitHubConnectModal = ({ open, onClose, onSuccess }) => {
               disabled={loading || !token.trim()}
               startIcon={loading ? <CircularProgress size={20} /> : <GitHubIcon />}
             >
-              {loading ? 'Đang kết nối...' : 'Kết nối GitHub'}
+              {loading ? 'Connecting...' : 'Connect GitHub'}
             </Button>
           </>
         ) : (
           <Button onClick={handleClose} variant="contained">
-            Đóng
+            Close
           </Button>
         )}
       </DialogActions>

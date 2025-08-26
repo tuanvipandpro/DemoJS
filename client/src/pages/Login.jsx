@@ -10,6 +10,7 @@ import {
   IconButton,
   InputAdornment,
   Container,
+  Link,
 } from '@mui/material';
 import {
   Visibility,
@@ -18,7 +19,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 
-const Login = () => {
+const Login = ({ onSwitchToRegister }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -177,6 +178,21 @@ const Login = () => {
           >
             Sign in with Google
           </Button>
+
+          <Box sx={{ textAlign: 'center', mt: 3 }}>
+            <Typography variant="body2">
+              Don't have an account?{' '}
+              <Link
+                component="button"
+                type="button"
+                variant="body2"
+                onClick={onSwitchToRegister}
+                sx={{ textDecoration: 'underline', cursor: 'pointer' }}
+              >
+                Sign up
+              </Link>
+            </Typography>
+          </Box>
 
           {/* Demo credentials removed */}
         </Paper>

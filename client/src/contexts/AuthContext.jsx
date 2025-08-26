@@ -70,6 +70,25 @@ export const AuthProvider = ({ children }) => {
     return { success: false, error: 'Google login is not available yet' };
   };
 
+  const register = async (userData) => {
+    try {
+      setLoading(true);
+      const res = await api.post('/auth/register', userData);
+      if (res.status === 200) {
+        return { success: true, user: res.data.user };
+      } else {
+        return { success: false, error: res.data?.error || 'Registration failed' };
+      }
+    } catch (err) {
+      return { 
+        success: false, 
+        error: err.response?.data?.error || 'Registration error' 
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = () => {
     clearAllAuthLike();
     setUser(null);
@@ -82,6 +101,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     loginWithGoogle,
+    register,
     logout,
   };
 

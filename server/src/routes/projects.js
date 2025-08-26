@@ -2,12 +2,12 @@ import express from 'express';
 import { logger } from '../utils/logger.js';
 import { encryptToken, decryptToken, maskToken } from '../utils/tokenEncryption.js';
 import { pool } from '../db/init.js';
-import { authenticateJWT, checkProjectAccess } from '../middleware/auth.js';
+import { ensureAuthenticated, checkProjectAccess } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Áp dụng middleware authentication cho tất cả routes
-router.use(authenticateJWT);
+router.use(ensureAuthenticated);
 
 // GET /api/projects - Lấy danh sách dự án
 router.get('/', async (req, res) => {
