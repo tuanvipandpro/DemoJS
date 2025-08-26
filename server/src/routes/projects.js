@@ -49,10 +49,10 @@ router.get('/', async (req, res) => {
       branch: project.branch,
       ownerId: project.owner_id,
       personalAccessToken: project.personal_access_token ? '***ENCRYPTED***' : null,
-      notifications: project.notifications ? JSON.parse(project.notifications) : [],
+      notifications: project.notifications ? (typeof project.notifications === 'string' ? JSON.parse(project.notifications) : project.notifications) : [],
       createdAt: project.created_at,
       isDelete: project.is_delete,
-      isDisable: project.is_disable,
+      isDisabled: project.is_disabled,
       status: project.status
     }));
     

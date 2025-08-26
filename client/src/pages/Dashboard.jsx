@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -18,6 +18,10 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import {
   Assignment as ProjectIcon,
@@ -28,9 +32,11 @@ import {
   AutoAwesome as AiIcon,
   ChangeCircle as ChangeIcon,
   PlayArrow as RunIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import Logo from '../components/Logo';
 import CreateProjectStepperModal from '../components/CreateProjectStepperModal';
+import { statsService } from '../services/index.js';
 import {
   ResponsiveContainer,
   LineChart,
@@ -45,6 +51,9 @@ import {
   RadialBarChart,
   RadialBar,
   PolarAngleAxis,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
 
 // Mini Sparkline component (inline SVG)
@@ -117,39 +126,69 @@ const KpiCard = ({ title, value, icon, iconBg = '#1976d2', rightContent }) => (
 );
 
 const Dashboard = () => {
-  // KPI demo data (mock)
-  const [connectedRepos, setConnectedRepos] = useState(3);
-  const [changesToday, setChangesToday] = useState(14);
-  const [testsToday, setTestsToday] = useState(62);
-  const [coverage, setCoverage] = useState(82);
+  // State cho stats
+  const [statsData, setStatsData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [timeRange, setTimeRange] = useState('7d');
 
   const [openConnectModal, setOpenConnectModal] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const passRateData = [62, 68, 64, 70, 74, 76, 81].map((v, i) => ({ day: days[i], passRate: v }));
-  const testsByDayData = [30, 42, 36, 55, 48, 60, 62].map((v, i) => ({ day: days[i], tests: v }));
-  const coverageGaugeData = [{ name: 'Coverage', value: coverage }];
+  // Fetch stats data
+  const fetchStats = async (range = timeRange) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await statsService.getSummary(range);
+      setStatsData(data);
+    } catch (err) {
+      setError(err.message || 'Không thể tải dữ liệu thống kê');
+      console.error('Error fetching stats:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const recentChanges = [
-    { id: 'c1', repo: 'insight/fe', branch: 'main', files: 6, lines: '+120/-34', message: 'Refactor AuthContext', status: 'Tests Passed' },
-    { id: 'c2', repo: 'insight/fe', branch: 'develop', files: 3, lines: '+48/-12', message: 'Add Git connect stepper', status: 'Tests Passed' },
-    { id: 'c3', repo: 'insight/api', branch: 'main', files: 8, lines: '+210/-55', message: 'Fix webhook signature', status: 'Tests Failed' },
-    { id: 'c4', repo: 'insight/runner', branch: 'main', files: 2, lines: '+12/-2', message: 'Tune AI test prompts', status: 'Running' },
-  ];
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
-  const recentRuns = [
-    { id: 'r1', name: 'Nightly - fe/main', result: 'Passed', duration: '4m 12s', coverage: 82 },
-    { id: 'r2', name: 'Manual - api/main', result: 'Failed', duration: '2m 07s', coverage: 76 },
-    { id: 'r3', name: 'Auto - runner/main', result: 'Running', duration: '—', coverage: null },
-  ];
+  const handleTimeRangeChange = (event) => {
+    const newRange = event.target.value;
+    setTimeRange(newRange);
+    fetchStats(newRange);
+  };
+
+  const handleRefresh = () => {
+    fetchStats();
+  };
+
+  // Format data for charts
+  const formatChartData = (dailyData) => {
+    if (!dailyData || dailyData.length === 0) return [];
+    
+    return dailyData.map(item => ({
+      date: new Date(item.date).toLocaleDateString('vi-VN', { 
+        month: 'short', 
+        day: 'numeric' 
+      }),
+      total: item.total_runs,
+      success: item.successful_runs,
+      failed: item.failed_runs,
+      successRate: item.total_runs > 0 
+        ? Math.round((item.successful_runs / item.total_runs) * 100) 
+        : 0
+    }));
+  };
+
+  const chartData = formatChartData(statsData?.daily_runs || []);
+  const projectPerformance = statsData?.project_performance || [];
+  const recentActivity = statsData?.recent_activity || [];
 
   const handleScanChanges = () => {
     // Simulate scan
-    setChangesToday((v) => v + 2);
-    setTestsToday((v) => v + 8);
-    setCoverage((c) => Math.min(100, c + 1));
-    setSnackbar({ open: true, message: 'Scanned changes and triggered AI tests', severity: 'success' });
+    setSnackbar({ open: true, message: 'Đã quét thay đổi và kích hoạt AI tests', severity: 'success' });
   };
 
   const handleCloseSnackbar = () => setSnackbar((s) => ({ ...s, open: false }));
@@ -157,223 +196,315 @@ const Dashboard = () => {
   return (
     <Box sx={{ flexGrow: 1, p: 3 }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-        <Logo size="large" />
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            AI Testing Dashboard
-          </Typography>
-          <Typography variant="body1" color="textSecondary">
-            Connect Git, detect code changes, auto-run AI tests, and track metrics with rich charts.
-          </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Logo size="large" />
+          <Box>
+            <Typography variant="h4" gutterBottom>
+              AI Testing Dashboard
+            </Typography>
+            <Typography variant="body1" color="textSecondary">
+              Kết nối Git, phát hiện thay đổi code, tự động chạy AI tests và theo dõi metrics với biểu đồ phong phú.
+            </Typography>
+          </Box>
+        </Box>
+        
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Thời gian</InputLabel>
+            <Select
+              value={timeRange}
+              label="Thời gian"
+              onChange={handleTimeRangeChange}
+            >
+              <MenuItem value="24h">24 giờ</MenuItem>
+              <MenuItem value="7d">7 ngày</MenuItem>
+              <MenuItem value="30d">30 ngày</MenuItem>
+              <MenuItem value="90d">90 ngày</MenuItem>
+            </Select>
+          </FormControl>
+          
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={handleRefresh}
+            disabled={loading}
+          >
+            Làm mới
+          </Button>
         </Box>
       </Box>
 
+      {/* Loading State */}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <Box sx={{ p: 2, mb: 3 }}>
+          <Alert severity="error" onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        </Box>
+      )}
+
       {/* KPI Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard
-            title="Connected Repos"
-            value={connectedRepos}
-            icon={<GitHubIcon fontSize="medium" />}
-            iconBg="#24292e"
-          />
+      {statsData && (
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <KpiCard
+              title="Tổng số Runs"
+              value={statsData.summary.total_runs}
+              icon={<RunIcon fontSize="medium" />}
+              iconBg="#1976d2"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <KpiCard
+              title="Tỷ lệ thành công"
+              value={`${statsData.summary.success_rate}%`}
+              icon={<TrendingIcon fontSize="medium" />}
+              iconBg="#2e7d32"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <KpiCard
+              title="Runs đang chạy"
+              value={statsData.summary.running_runs}
+              icon={<ScheduleIcon fontSize="medium" />}
+              iconBg="#ed6c02"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <KpiCard
+              title="Dự án hoạt động"
+              value={statsData.summary.active_projects}
+              icon={<ProjectIcon fontSize="medium" />}
+              iconBg="#9c27b0"
+            />
+          </Grid>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard
-            title="Changes Today"
-            value={changesToday}
-            icon={<ChangeIcon fontSize="medium" />}
-            iconBg="#ed6c02"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard
-            title="AI Tests Today"
-            value={testsToday}
-            icon={<AiIcon fontSize="medium" />}
-            iconBg="#2e7d32"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <KpiCard
-            title="Coverage"
-            value={`${coverage}%`}
-            rightContent={
-              <ResponsiveContainer width="100%" height="100%">
-                <RadialBarChart
-                  data={coverageGaugeData}
-                  startAngle={180}
-                  endAngle={180 + (coverage / 100) * 180}
-                  innerRadius="70%"
-                  outerRadius="100%"
-                >
-                  <RadialBar dataKey="value" minAngle={15} clockWise fill="#1976d2" background />
-                </RadialBarChart>
-              </ResponsiveContainer>
-            }
-          />
-        </Grid>
-      </Grid>
+      )}
 
       {/* Charts + Lists */}
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="h6">Pass rate (last 7 days)</Typography>
-              <Chip size="small" label={`${passRateData[passRateData.length - 1].passRate}% today`} color="success" />
-            </Box>
-            <Box sx={{ width: '100%', height: 260 }}>
-              <ResponsiveContainer>
-                <LineChart data={passRateData} margin={{ top: 10, right: 16, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis unit="%" domain={[0, 100]} />
-                  <RechartsTooltip formatter={(v) => [`${v}%`, 'Pass rate']} />
-                  <Legend />
-                  <Line type="monotone" dataKey="passRate" stroke="#1976d2" strokeWidth={2} dot={{ r: 3 }} name="Pass rate" />
-                </LineChart>
-              </ResponsiveContainer>
-            </Box>
-          </Paper>
-
-          <Paper sx={{ p: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="h6">Tests by day (last 7 days)</Typography>
-            </Box>
-            <Box sx={{ width: '100%', height: 260 }}>
-              <ResponsiveContainer>
-                <BarChart data={testsByDayData} margin={{ top: 10, right: 16, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis />
-                  <RechartsTooltip />
-                  <Legend />
-                  <Bar dataKey="tests" fill="#ed6c02" name="Tests" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Box>
-          </Paper>
-
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Recent code changes
-            </Typography>
-            <List>
-              {recentChanges.map((c) => (
-                <ListItem key={c.id} divider>
-                  <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: c.status === 'Tests Failed' ? 'error.main' : c.status === 'Running' ? 'warning.main' : 'primary.main' }}>
-                      <GitHubIcon />
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{c.message}</Typography>
-                        <Chip size="small" variant="outlined" label={`${c.repo}:${c.branch}`} />
-                      </Box>
-                    }
-                    secondary={`${c.files} files • ${c.lines}`}
-                  />
-                  <Chip
-                    label={c.status}
-                    color={c.status === 'Tests Failed' ? 'error' : c.status === 'Running' ? 'warning' : 'success'}
-                    size="small"
-                  />
-                </ListItem>
-              ))}
-            </List>
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Quick Actions
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Button variant="contained" startIcon={<GitHubIcon />} onClick={() => setOpenConnectModal(true)}>
-                Connect Git
-              </Button>
-              <Button variant="outlined" startIcon={<RunIcon />} onClick={handleScanChanges}>
-                Scan changes & run AI tests
-              </Button>
-            </Box>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="body2" color="textSecondary">
-              Auto-triggers on new commits via webhook. You can also trigger manually here.
-            </Typography>
-          </Paper>
-
-          <Paper sx={{ p: 2, mb: 3, position: 'relative' }}>
-            <Typography variant="h6" gutterBottom>
-              Coverage gauge
-            </Typography>
-            <Box sx={{ width: '100%', height: 220, position: 'relative' }}>
-              <ResponsiveContainer>
-                <RadialBarChart
-                  innerRadius="70%"
-                  outerRadius="100%"
-                  startAngle={180}
-                  endAngle={0}
-                  data={[{ name: 'bg', value: 100 }, { name: 'Coverage', value: coverage }]}
-                >
-                  <RadialBar dataKey="value" background fill="#e0e0e0" cornerRadius={8} />
-                  <RadialBar dataKey="value" data={[{ name: 'Coverage', value: coverage }]} fill="#1976d2" cornerRadius={8} />
-                </RadialBarChart>
-              </ResponsiveContainer>
-              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography variant="h4">{coverage}%</Typography>
+      {statsData && (
+        <Grid container spacing={3}>
+          {/* Left Column - Charts */}
+          <Grid item xs={12} md={8}>
+            <Paper sx={{ p: 2, mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="h6">Tỷ lệ thành công theo ngày</Typography>
+                <Chip 
+                  size="small" 
+                  label={`${chartData.length > 0 ? chartData[chartData.length - 1].successRate : 0}% hôm nay`} 
+                  color="success" 
+                />
               </Box>
-            </Box>
-          </Paper>
+              <Box sx={{ width: '100%', height: 260 }}>
+                <ResponsiveContainer>
+                  <LineChart data={chartData} margin={{ top: 10, right: 16, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis unit="%" domain={[0, 100]} />
+                    <RechartsTooltip formatter={(v) => [`${v}%`, 'Tỷ lệ thành công']} />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="successRate" 
+                      stroke="#1976d2" 
+                      strokeWidth={2} 
+                      dot={{ r: 3 }} 
+                      name="Tỷ lệ thành công" 
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Box>
+            </Paper>
 
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Recent runs
-            </Typography>
-            <List>
-              {recentRuns.map((r) => (
-                <ListItem key={r.id} divider>
-                  <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: r.result === 'Failed' ? 'error.main' : r.result === 'Running' ? 'warning.main' : 'success.main' }}>
-                      <AiIcon />
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={r.name}
-                    secondary={r.duration !== '—' ? `Duration: ${r.duration}` : 'Running...'}
-                  />
-                  <Chip
-                    label={r.result}
-                    color={r.result === 'Failed' ? 'error' : r.result === 'Running' ? 'warning' : 'success'}
-                    size="small"
-                  />
-                </ListItem>
-              ))}
-            </List>
-          </Paper>
+            <Paper sx={{ p: 2, mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="h6">Số lượng runs theo ngày</Typography>
+              </Box>
+              <Box sx={{ width: '100%', height: 260 }}>
+                <ResponsiveContainer>
+                  <BarChart data={chartData} margin={{ top: 10, right: 16, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <RechartsTooltip />
+                    <Legend />
+                    <Bar dataKey="total" fill="#ed6c02" name="Tổng runs" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="success" fill="#2e7d32" name="Thành công" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="failed" fill="#d32f2f" name="Thất bại" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            </Paper>
+
+            <Paper sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Hoạt động gần đây
+              </Typography>
+              <List>
+                {recentActivity.length > 0 ? (
+                  recentActivity.map((run) => (
+                    <ListItem key={run.id} divider>
+                      <ListItemAvatar>
+                        <Avatar sx={{ 
+                          bgcolor: run.state === 'FAILED' ? 'error.main' : 
+                                   run.state === 'RUNNING' ? 'warning.main' : 
+                                   run.state === 'SUCCESS' ? 'success.main' : 'primary.main' 
+                        }}>
+                          <RunIcon />
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                              {run.project_name}
+                            </Typography>
+                            <Chip size="small" variant="outlined" label={`Run #${run.id}`} />
+                          </Box>
+                        }
+                        secondary={
+                          <Box>
+                            <Typography variant="body2" color="textSecondary">
+                              {new Date(run.created_at).toLocaleString('vi-VN')}
+                            </Typography>
+                            {run.duration_minutes && (
+                              <Typography variant="body2" color="textSecondary">
+                                Thời gian: {run.duration_minutes} phút
+                              </Typography>
+                            )}
+                          </Box>
+                        }
+                      />
+                      <Chip
+                        label={run.state === 'SUCCESS' ? 'Thành công' : 
+                               run.state === 'FAILED' ? 'Thất bại' : 
+                               run.state === 'RUNNING' ? 'Đang chạy' : 
+                               run.state === 'QUEUED' ? 'Đang chờ' : run.state}
+                        color={run.state === 'FAILED' ? 'error' : 
+                               run.state === 'RUNNING' ? 'warning' : 
+                               run.state === 'SUCCESS' ? 'success' : 'default'}
+                        size="small"
+                      />
+                    </ListItem>
+                  ))
+                ) : (
+                  <Box sx={{ p: 2, textAlign: 'center' }}>
+                    <Typography variant="body2" color="textSecondary">
+                      Không có hoạt động nào trong khoảng thời gian này
+                    </Typography>
+                  </Box>
+                )}
+              </List>
+            </Paper>
+          </Grid>
+
+          {/* Right Column - Sidebar */}
+          <Grid item xs={12} md={4}>
+            <Paper sx={{ p: 2, mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Thao tác nhanh
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Button variant="contained" startIcon={<GitHubIcon />} onClick={() => setOpenConnectModal(true)}>
+                  Kết nối Git
+                </Button>
+                <Button variant="outlined" startIcon={<RunIcon />} onClick={handleScanChanges}>
+                  Quét thay đổi & chạy AI tests
+                </Button>
+              </Box>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="body2" color="textSecondary">
+                Tự động kích hoạt khi có commit mới qua webhook. Bạn cũng có thể kích hoạt thủ công tại đây.
+              </Typography>
+            </Paper>
+
+            <Paper sx={{ p: 2, mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Hiệu suất dự án
+              </Typography>
+              {projectPerformance.length > 0 ? (
+                <Box sx={{ width: '100%', height: 220 }}>
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie
+                        data={projectPerformance.slice(0, 5)}
+                        dataKey="total_runs"
+                        nameKey="project_name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label={({ project_name, total_runs }) => `${project_name}: ${total_runs}`}
+                      >
+                        {projectPerformance.slice(0, 5).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f'][index % 5]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </Box>
+              ) : (
+                <Box sx={{ p: 2, textAlign: 'center' }}>
+                  <Typography variant="body2" color="textSecondary">
+                    Không có dữ liệu hiệu suất dự án
+                  </Typography>
+                </Box>
+              )}
+            </Paper>
+
+            <Paper sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Thống kê tổng quan
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="body2">Thời gian trung bình:</Typography>
+                  <Typography variant="h6" color="primary">
+                    {statsData?.summary.avg_duration_minutes || 0} phút
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="body2">Runs đang chờ:</Typography>
+                  <Typography variant="h6" color="warning.main">
+                    {statsData?.summary.queued_runs || 0}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="body2">Tổng dự án:</Typography>
+                  <Typography variant="h6" color="success.main">
+                    {statsData?.summary.active_projects || 0}
+                  </Typography>
+                </Box>
+              </Box>
+            </Paper>
+          </Grid>
         </Grid>
-      </Grid>
+      )}
 
       {/* Modals & Snackbar */}
       <CreateProjectStepperModal
         open={openConnectModal}
         onClose={() => setOpenConnectModal(false)}
         onSubmit={() => {
-          setConnectedRepos((v) => v + 1);
           setOpenConnectModal(false);
-          setSnackbar({ open: true, message: 'Connected Git repository successfully', severity: 'success' });
+          setSnackbar({ open: true, message: 'Đã kết nối Git repository thành công', severity: 'success' });
         }}
       />
 
+      {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
         onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
         <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}

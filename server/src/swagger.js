@@ -3,7 +3,7 @@ export const openApiSpec = {
   info: {
     title: 'InsightTestAI Server API',
     version: '1.0.0',
-    description: 'API cho nền tảng AI-powered testing với tích hợp Git providers',
+    description: 'API cho nền tảng AI-powered testing với tích hợp Git providers, Worker management, và Queue processing',
     contact: {
       name: 'InsightTestAI Team'
     }
@@ -100,43 +100,64 @@ export const openApiSpec = {
       GitHubUser: {
         type: 'object',
         properties: {
+          id: { type: 'number' },
           login: { type: 'string' },
           name: { type: 'string' },
           email: { type: 'string', format: 'email' },
-          avatar_url: { type: 'string', format: 'uri' }
+          avatar_url: { type: 'string', format: 'uri' },
+          html_url: { type: 'string', format: 'uri' }
         }
       },
-      Repository: {
+      GitHubRepository: {
         type: 'object',
         properties: {
-          id: { type: 'integer' },
+          id: { type: 'number' },
           name: { type: 'string' },
           full_name: { type: 'string' },
-          private: { type: 'boolean' },
           description: { type: 'string' },
-          language: { type: 'string' },
-          updated_at: { type: 'string', format: 'date-time' },
           html_url: { type: 'string', format: 'uri' },
-          clone_url: { type: 'string', format: 'uri' }
+          clone_url: { type: 'string', format: 'uri' },
+          ssh_url: { type: 'string' },
+          default_branch: { type: 'string' },
+          private: { type: 'boolean' },
+          fork: { type: 'boolean' },
+          size: { type: 'number' },
+          stargazers_count: { type: 'number' },
+          watchers_count: { type: 'number' },
+          language: { type: 'string' },
+          has_issues: { type: 'boolean' },
+          has_projects: { type: 'boolean' },
+          has_downloads: { type: 'boolean' },
+          has_wiki: { type: 'boolean' },
+          has_pages: { type: 'boolean' },
+          has_discussions: { type: 'boolean' },
+          forks_count: { type: 'number' },
+          mirror_url: { type: 'string', format: 'uri' },
+          archived: { type: 'boolean' },
+          disabled: { type: 'boolean' },
+          open_issues_count: { type: 'number' },
+          license: { type: 'object' },
+          allow_forking: { type: 'boolean' },
+          is_template: { type: 'boolean' },
+          web_commit_signoff_required: { type: 'boolean' },
+          topics: { type: 'array', items: { type: 'string' } },
+          visibility: { type: 'string' },
+          forks: { type: 'number' },
+          open_issues: { type: 'number' },
+          watchers: { type: 'number' },
+          default_branch: { type: 'string' }
         }
       },
-      Branch: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', description: 'Tên branch' },
-          commitSha: { type: 'string', description: 'SHA của commit cuối cùng' },
-          commitUrl: { type: 'string', format: 'uri', description: 'URL của commit' },
-          protection: { type: 'object', description: 'Thông tin bảo vệ branch (nếu có)' }
-        }
-      },
-      GitHubConnectResponse: {
+      GitHubTokenResponse: {
         type: 'object',
         properties: {
           success: { type: 'boolean' },
+          message: { type: 'string' },
+          token: { type: 'string' },
           user: { $ref: '#/components/schemas/GitHubUser' },
           repositories: {
             type: 'array',
-            items: { $ref: '#/components/schemas/Repository' }
+            items: { $ref: '#/components/schemas/GitHubRepository' }
           }
         }
       },
@@ -146,150 +167,410 @@ export const openApiSpec = {
         type: 'object',
         properties: {
           id: { type: 'string', format: 'uuid' },
-          name: { type: 'string', description: 'Tên dự án' },
-          description: { type: 'string', description: 'Mô tả dự án' },
-          gitProvider: { type: 'string', description: 'Nhà cung cấp Git (github, gitlab, etc.)' },
-          repository: { type: 'string', description: 'Tên repository' },
-          branch: { type: 'string', description: 'Nhánh chính' },
-          ownerId: { type: 'string', format: 'uuid', description: 'ID của user tạo project' },
-          personalAccessToken: { 
-            type: 'string', 
-            description: 'Personal Access Token đã mã hóa (masked as ***ENCRYPTED*** in responses)'
-          },
-          notifications: { 
+          name: { type: 'string' },
+          description: { type: 'string' },
+          gitProvider: { type: 'string', enum: ['github', 'gitlab', 'bitbucket', 'azure'] },
+          repository: { type: 'string' },
+          branch: { type: 'string' },
+          ownerId: { type: 'string', format: 'uuid' },
+          personalAccessToken: { type: 'string' },
+          notifications: {
             type: 'array',
-            items: { type: 'string' },
-            description: 'Danh sách thông báo (email, slack, etc.)'
+            items: { type: 'string' }
           },
-          createdAt: { type: 'string', format: 'date-time', description: 'Thời gian tạo' },
-          isDelete: { type: 'boolean', description: 'Trạng thái xóa (soft delete)', default: false },
-          isDisable: { type: 'boolean', description: 'Trạng thái vô hiệu hóa', default: false },
-          status: { type: 'string', description: 'Trạng thái dự án', default: 'active' }
+          createdAt: { type: 'string', format: 'date-time' },
+          isDelete: { type: 'boolean' },
+          isDisable: { type: 'boolean' },
+          status: { type: 'string' }
         }
       },
-      CreateProjectRequest: {
+      ProjectCreateRequest: {
         type: 'object',
-        required: ['name'],
+        required: ['name', 'gitProvider', 'repository'],
         properties: {
-          name: { type: 'string', maxLength: 255, description: 'Tên dự án (bắt buộc)' },
-          description: { type: 'string', description: 'Mô tả dự án' },
-          gitProvider: { type: 'string', maxLength: 50, description: 'Nhà cung cấp Git' },
-          repository: { type: 'string', maxLength: 255, description: 'Tên repository' },
-          branch: { type: 'string', maxLength: 100, description: 'Nhánh chính' },
-          personalAccessToken: { 
-            type: 'string', 
-            description: 'Personal Access Token (sẽ được mã hóa và lưu an toàn)'
-          },
-          notifications: { 
+          name: { type: 'string', minLength: 1, maxLength: 100 },
+          description: { type: 'string', maxLength: 500 },
+          gitProvider: { type: 'string', enum: ['github', 'gitlab', 'bitbucket', 'azure'] },
+          personalAccessToken: { type: 'string' },
+          repository: { type: 'string' },
+          branch: { type: 'string', default: 'main' },
+          notifications: {
             type: 'array',
-            items: { type: 'string' },
-            description: 'Danh sách thông báo'
+            items: { type: 'string' }
           }
         }
       },
-      UpdateProjectRequest: {
+      ProjectUpdateRequest: {
         type: 'object',
         properties: {
-          name: { type: 'string', maxLength: 255, description: 'Tên dự án' },
-          description: { type: 'string', description: 'Mô tả dự án' },
-          gitProvider: { type: 'string', maxLength: 50, description: 'Nhà cung cấp Git' },
-          repository: { type: 'string', maxLength: 255, description: 'Tên repository' },
-          branch: { type: 'string', maxLength: 100, description: 'Nhánh chính' },
-          personalAccessToken: { 
-            type: 'string', 
-            description: 'Personal Access Token mới (sẽ được mã hóa và lưu an toàn)'
-          },
-          notifications: { 
+          name: { type: 'string', minLength: 1, maxLength: 100 },
+          description: { type: 'string', maxLength: 500 },
+          personalAccessToken: { type: 'string' },
+          branch: { type: 'string' },
+          notifications: {
             type: 'array',
-            items: { type: 'string' },
-            description: 'Danh sách thông báo'
-          },
-          status: { type: 'string', description: 'Trạng thái dự án' }
-        }
-      },
-      ProjectResponse: {
-        type: 'object',
-        properties: {
-          success: { type: 'boolean' },
-          project: { $ref: '#/components/schemas/Project' }
-        }
-      },
-      ProjectsResponse: {
-        type: 'object',
-        properties: {
-          success: { type: 'boolean' },
-          projects: {
-            type: 'array',
-            items: { $ref: '#/components/schemas/Project' }
+            items: { type: 'string' }
           }
-        }
-      },
-      ProjectDisableRequest: {
-        type: 'object',
-        required: ['isDisable'],
-        properties: {
-          isDisable: { type: 'boolean', description: 'Trạng thái vô hiệu hóa' }
-        }
-      },
-      ProjectStatusRequest: {
-        type: 'object',
-        required: ['status'],
-        properties: {
-          status: { type: 'string', description: 'Trạng thái dự án' }
-        }
-      },
-      GitHubTokenResponse: {
-        type: 'object',
-        properties: {
-          success: { type: 'boolean' },
-          token: { type: 'string', description: 'GitHub Personal Access Token đã giải mã' },
-          gitProvider: { type: 'string', description: 'Git provider' },
-          repository: { type: 'string', description: 'Tên repository' }
         }
       },
       
       // Vector schemas
       VectorInsertRequest: {
         type: 'object',
-        required: ['namespace', 'content', 'embedding'],
+        required: ['content', 'namespace'],
         properties: {
-          namespace: { type: 'string', description: 'Namespace cho vector' },
           content: { type: 'string', description: 'Nội dung tài liệu' },
-          embedding: {
-            type: 'array',
-            items: { type: 'number' },
-            description: 'Embedding vector, ví dụ 1536 chiều'
-          }
+          namespace: { type: 'string', description: 'Namespace cho tài liệu' },
+          metadata: { type: 'object', description: 'Metadata bổ sung' }
         }
       },
       VectorSearchRequest: {
         type: 'object',
-        required: ['namespace', 'embedding'],
+        required: ['query', 'namespace'],
         properties: {
+          query: { type: 'string', description: 'Query text để tìm kiếm' },
           namespace: { type: 'string', description: 'Namespace để tìm kiếm' },
-          embedding: {
-            type: 'array',
-            items: { type: 'number' },
-            description: 'Embedding vector để tìm kiếm'
-          },
-          limit: { type: 'integer', default: 5, minimum: 1, maximum: 100 }
+          topK: { type: 'integer', minimum: 1, maximum: 100, default: 10, description: 'Số lượng kết quả trả về' },
+          scoreThreshold: { type: 'number', minimum: 0, maximum: 1, description: 'Ngưỡng score tối thiểu' }
         }
       },
       
-      // Error schemas
-      ErrorResponse: {
+      // Worker schemas
+      WorkerStatus: {
         type: 'object',
         properties: {
-          error: { type: 'string' },
-          message: { type: 'string' },
-          details: { type: 'object' }
+          overall: { type: 'string', enum: ['healthy', 'degraded', 'unhealthy'] },
+          worker: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', enum: ['healthy', 'unhealthy', 'unknown'] },
+              url: { type: 'string', format: 'uri' },
+              details: { type: 'object' }
+            }
+          },
+          database: {
+            type: 'object',
+            properties: {
+              status: { type: 'string', enum: ['healthy', 'unhealthy', 'unknown'] }
+            }
+          }
         }
       },
+      WorkerConfiguration: {
+        type: 'object',
+        properties: {
+          configuration: { type: 'object' },
+          environment: {
+            type: 'object',
+            properties: {
+              NODE_ENV: { type: 'string' },
+              WORKER_URL: { type: 'string', format: 'uri' }
+            }
+          }
+        }
+      },
+      QueueStats: {
+        type: 'object',
+        properties: {
+          queue: { type: 'object' },
+          database: {
+            type: 'object',
+            properties: {
+              last24h: {
+                type: 'object',
+                properties: {
+                  total_runs: { type: 'integer' },
+                  queued_runs: { type: 'integer' },
+                  running_runs: { type: 'integer' },
+                  completed_runs: { type: 'integer' },
+                  failed_runs: { type: 'integer' }
+                }
+              }
+            }
+          }
+        }
+      },
+      
+      // Agent Run schemas
+      AgentRun: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          projectId: { type: 'string', format: 'uuid' },
+          projectName: { type: 'string' },
+          projectRepository: { type: 'string' },
+          userId: { type: 'string', format: 'uuid' },
+          userEmail: { type: 'string', format: 'email' },
+          status: { type: 'string', enum: ['queued', 'running', 'completed', 'failed'] },
+          state: { type: 'string', enum: ['QUEUED', 'PLANNING', 'TOOLING', 'OBSERVING', 'ADJUSTING', 'DONE', 'ERROR', 'WAITING_REVIEW'] },
+          commitId: { type: 'string' },
+          branch: { type: 'string' },
+          diffSummary: { type: 'string' },
+          testPlan: { type: 'object' },
+          testResults: { type: 'object' },
+          coverage: { type: 'number', minimum: 0, maximum: 100 },
+          confidenceScore: { type: 'number', minimum: 0, maximum: 1 },
+          errorMessage: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' }
+        }
+      },
+      AgentRunCreateRequest: {
+        type: 'object',
+        required: ['projectId', 'commitId'],
+        properties: {
+          projectId: { type: 'string', format: 'uuid' },
+          commitId: { type: 'string' },
+          branch: { type: 'string', default: 'main' },
+          diffSummary: { type: 'string' },
+          priority: { type: 'string', enum: ['low', 'normal', 'high'], default: 'normal' }
+        }
+      },
+      AgentRunUpdateRequest: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['queued', 'running', 'completed', 'failed'] },
+          state: { type: 'string', enum: ['QUEUED', 'PLANNING', 'TOOLING', 'OBSERVING', 'ADJUSTING', 'DONE', 'ERROR', 'WAITING_REVIEW'] },
+          errorMessage: { type: 'string' },
+          testResults: { type: 'object' },
+          coverage: { type: 'number', minimum: 0, maximum: 100 },
+          confidenceScore: { type: 'number', minimum: 0, maximum: 1 }
+        }
+      },
+      AgentRunStats: {
+        type: 'object',
+        properties: {
+          range: { type: 'string' },
+          projectId: { type: 'string', format: 'uuid' },
+          statistics: {
+            type: 'object',
+            properties: {
+              totalRuns: { type: 'integer' },
+              queuedRuns: { type: 'integer' },
+              runningRuns: { type: 'integer' },
+              completedRuns: { type: 'integer' },
+              failedRuns: { type: 'integer' },
+              avgConfidence: { type: 'number' },
+              avgCoverage: { type: 'number' }
+            }
+          }
+        }
+      },
+      RunLog: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          runId: { type: 'string', format: 'uuid' },
+          level: { type: 'string', enum: ['debug', 'info', 'warn', 'error'] },
+          message: { type: 'string' },
+          metadata: { type: 'object' },
+          createdAt: { type: 'string', format: 'date-time' }
+        }
+      },
+      
+      // Queue schemas
+      QueueMessage: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          messageId: { type: 'string' },
+          type: { type: 'string' },
+          data: { type: 'object' },
+          priority: { type: 'string', enum: ['low', 'normal', 'high'] },
+          delay: { type: 'integer', minimum: 0 },
+          userId: { type: 'string', format: 'uuid' },
+          userEmail: { type: 'string', format: 'email' },
+          projectId: { type: 'string', format: 'uuid' },
+          projectName: { type: 'string' },
+          status: { type: 'string', enum: ['queued', 'pending', 'processing', 'acknowledged', 'nack', 'deleted', 'cleared'] },
+          errorReason: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' }
+        }
+      },
+      QueueEnqueueRequest: {
+        type: 'object',
+        required: ['type', 'data'],
+        properties: {
+          type: { type: 'string', description: 'Loại message' },
+          data: { type: 'object', description: 'Dữ liệu message' },
+          priority: { type: 'string', enum: ['low', 'normal', 'high'], default: 'normal' },
+          delay: { type: 'integer', minimum: 0, default: 0, description: 'Delay trước khi xử lý (giây)' }
+        }
+      },
+      QueueDequeueRequest: {
+        type: 'object',
+        properties: {
+          timeout: { type: 'integer', minimum: 1, maximum: 300, default: 30, description: 'Timeout chờ message (giây)' }
+        }
+      },
+      QueueNackRequest: {
+        type: 'object',
+        properties: {
+          reason: { type: 'string', description: 'Lý do nack' },
+          requeue: { type: 'boolean', default: false, description: 'Có requeue message không' }
+        }
+      },
+      QueueClearRequest: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['queued', 'pending', 'processing', 'acknowledged', 'nack', 'deleted'] },
+          type: { type: 'string', description: 'Loại message để clear' },
+          projectId: { type: 'string', format: 'uuid', description: 'Project ID để clear' }
+        }
+      },
+      
+      // Common schemas
       SuccessResponse: {
         type: 'object',
         properties: {
-          success: { type: 'boolean' },
-          message: { type: 'string' }
+          success: { type: 'boolean', example: true },
+          message: { type: 'string' },
+          data: { type: 'object' }
+        }
+      },
+      ErrorResponse: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: false },
+          error: { type: 'string' },
+          details: { type: 'object' }
+        }
+      },
+      PaginationResponse: {
+        type: 'object',
+        properties: {
+          limit: { type: 'integer' },
+          offset: { type: 'integer' },
+          total: { type: 'integer' }
+        }
+      },
+      
+      // Stats schemas
+      StatsSummary: {
+        type: 'object',
+        properties: {
+          range: { type: 'string', enum: ['24h', '7d', '30d', '90d'] },
+          summary: {
+            type: 'object',
+            properties: {
+              total_runs: { type: 'integer', description: 'Tổng số runs' },
+              successful_runs: { type: 'integer', description: 'Số runs thành công' },
+              failed_runs: { type: 'integer', description: 'Số runs thất bại' },
+              running_runs: { type: 'integer', description: 'Số runs đang chạy' },
+              queued_runs: { type: 'integer', description: 'Số runs đang chờ' },
+              success_rate: { type: 'integer', description: 'Tỷ lệ thành công (%)' },
+              avg_duration_minutes: { type: 'integer', description: 'Thời gian trung bình (phút)' },
+              active_projects: { type: 'integer', description: 'Số dự án hoạt động' }
+            }
+          },
+          daily_runs: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                date: { type: 'string', format: 'date' },
+                total_runs: { type: 'integer' },
+                successful_runs: { type: 'integer' },
+                failed_runs: { type: 'integer' }
+              }
+            }
+          },
+          project_performance: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                project_name: { type: 'string' },
+                total_runs: { type: 'integer' },
+                successful_runs: { type: 'integer' },
+                failed_runs: { type: 'integer' },
+                success_rate: { type: 'number' }
+              }
+            }
+          },
+          recent_activity: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                state: { type: 'string', enum: ['SUCCESS', 'FAILED', 'RUNNING', 'QUEUED'] },
+                created_at: { type: 'string', format: 'date-time' },
+                finished_at: { type: 'string', format: 'date-time' },
+                project_name: { type: 'string' },
+                duration_minutes: { type: 'integer' }
+              }
+            }
+          }
+        }
+      },
+      
+      ProjectStatsSummary: {
+        type: 'object',
+        properties: {
+          project_id: { type: 'string', format: 'uuid' },
+          range: { type: 'string', enum: ['24h', '7d', '30d', '90d'] },
+          summary: {
+            type: 'object',
+            properties: {
+              total_runs: { type: 'integer' },
+              successful_runs: { type: 'integer' },
+              failed_runs: { type: 'integer' },
+              running_runs: { type: 'integer' },
+              success_rate: { type: 'integer' },
+              avg_duration_minutes: { type: 'integer' },
+              first_run: { type: 'string', format: 'date-time' },
+              last_run: { type: 'string', format: 'date-time' }
+            }
+          },
+          daily_runs: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                date: { type: 'string', format: 'date' },
+                total_runs: { type: 'integer' },
+                successful_runs: { type: 'integer' },
+                failed_runs: { type: 'integer' }
+              }
+            }
+          },
+          run_history: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                state: { type: 'string', enum: ['SUCCESS', 'FAILED', 'RUNNING', 'QUEUED'] },
+                created_at: { type: 'string', format: 'date-time' },
+                finished_at: { type: 'string', format: 'date-time' },
+                duration_minutes: { type: 'integer' }
+              }
+            }
+          }
+        }
+      },
+      
+      TrendsData: {
+        type: 'object',
+        properties: {
+          days: { type: 'integer', description: 'Số ngày được yêu cầu' },
+          trends: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                date: { type: 'string', format: 'date' },
+                total_runs: { type: 'integer' },
+                successful_runs: { type: 'integer' },
+                failed_runs: { type: 'integer' },
+                success_rate: { type: 'integer' },
+                avg_duration_minutes: { type: 'integer' },
+                moving_avg_success_rate: { type: 'integer', description: 'Moving average 7 ngày' }
+              }
+            }
+          }
         }
       }
     }
@@ -746,7 +1027,7 @@ export const openApiSpec = {
             description: 'Kết nối thành công',
             content: {
               'application/json': {
-                schema: { $ref: '#/components/schemas/GitHubConnectResponse' }
+                schema: { $ref: '#/components/schemas/GitHubTokenResponse' }
               }
             }
           },
@@ -1335,6 +1616,1361 @@ export const openApiSpec = {
           },
           401: { 
             description: 'Unauthorized',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    // Worker endpoints
+    '/worker/status': {
+      get: {
+        tags: ['Worker'],
+        summary: 'Lấy trạng thái tổng quan của Worker',
+        description: 'Lấy trạng thái tổng quan của Worker và các thành phần con (database, queue, etc.)',
+        responses: {
+          200: {
+            description: 'Trạng thái tổng quan của Worker',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/WorkerStatus' }
+              }
+            }
+          },
+          503: {
+            description: 'Service Unavailable - Worker không khả dụng',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/worker/configuration': {
+      get: {
+        tags: ['Worker'],
+        summary: 'Lấy cấu hình hiện tại của Worker',
+        description: 'Lấy cấu hình hiện tại của Worker, bao gồm cấu hình và môi trường',
+        responses: {
+          200: {
+            description: 'Cấu hình hiện tại của Worker',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/WorkerConfiguration' }
+              }
+            }
+          },
+          503: {
+            description: 'Service Unavailable - Worker không khả dụng',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/worker/queue/stats': {
+      get: {
+        tags: ['Worker'],
+        summary: 'Lấy thống kê về hàng đợi của Worker',
+        description: 'Lấy thống kê về hàng đợi của Worker, bao gồm thống kê hàng đợi và thống kê cơ sở dữ liệu trong 24 giờ gần nhất',
+        responses: {
+          200: {
+            description: 'Thống kê về hàng đợi của Worker',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/QueueStats' }
+              }
+            }
+          },
+          503: {
+            description: 'Service Unavailable - Worker không khả dụng',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/worker/queue/purge': {
+      post: {
+        tags: ['Worker'],
+        summary: 'Xóa tất cả messages trong queue của Worker',
+        description: 'Xóa tất cả messages trong queue của Worker (emergency cleanup)',
+        responses: {
+          200: {
+            description: 'Queue được purge thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/SuccessResponse' }
+              }
+            }
+          },
+          503: {
+            description: 'Service Unavailable - Worker không khả dụng',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/worker/restart': {
+      post: {
+        tags: ['Worker'],
+        summary: 'Gửi signal khởi động lại Worker',
+        description: 'Gửi signal để Worker khởi động lại (apply configuration changes)',
+        responses: {
+          200: {
+            description: 'Signal restart được gửi thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/SuccessResponse' }
+              }
+            }
+          },
+          503: {
+            description: 'Service Unavailable - Worker không khả dụng',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+
+
+    // Agent Run endpoints
+    '/runs': {
+      get: {
+        tags: ['Agent Runs'],
+        summary: 'Lấy danh sách Agent Runs',
+        description: 'Lấy danh sách Agent Runs theo thời gian và project. Có thể lọc bởi projectId và trạng thái.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'query',
+            name: 'projectId',
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của project (để lọc)',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'status',
+            schema: { type: 'string', enum: ['queued', 'running', 'completed', 'failed'] },
+            description: 'Trạng thái của Agent Run (để lọc)',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'fromDate',
+            schema: { type: 'string', format: 'date-time' },
+            description: 'Ngày bắt đầu (để lọc)',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'toDate',
+            schema: { type: 'string', format: 'date-time' },
+            description: 'Ngày kết thúc (để lọc)',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'limit',
+            schema: { type: 'integer', minimum: 1, maximum: 100, default: 10 },
+            description: 'Số lượng kết quả trả về',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'offset',
+            schema: { type: 'integer', default: 0 },
+            description: 'Số lượng kết quả để bỏ qua',
+            required: false
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Danh sách Agent Runs',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    data: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/AgentRun' }
+                    },
+                    pagination: { $ref: '#/components/schemas/PaginationResponse' }
+                  }
+                }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      },
+      post: {
+        tags: ['Agent Runs'],
+        summary: 'Tạo mới Agent Run',
+        description: 'Tạo mới Agent Run cho một project cụ thể. ProjectId và CommitId là bắt buộc.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/AgentRunCreateRequest' }
+            }
+          }
+        },
+        responses: {
+          201: {
+            description: 'Agent Run được tạo thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AgentRun' }
+              }
+            }
+          },
+          400: {
+            description: 'Bad Request - Dữ liệu không hợp lệ',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Project không tìm thấy',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/runs/{id}': {
+      get: {
+        tags: ['Agent Runs'],
+        summary: 'Lấy Agent Run theo ID',
+        description: 'Lấy thông tin chi tiết của một Agent Run cụ thể.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'id',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của Agent Run'
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Thông tin Agent Run',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AgentRun' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          403: {
+            description: 'Forbidden - Không có quyền truy cập Agent Run này',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Agent Run không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      },
+      put: {
+        tags: ['Agent Runs'],
+        summary: 'Cập nhật Agent Run',
+        description: 'Cập nhật thông tin của một Agent Run. Chỉ có thể cập nhật trạng thái và kết quả.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'id',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của Agent Run'
+          }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/AgentRunUpdateRequest' }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: 'Agent Run được cập nhật thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AgentRun' }
+              }
+            }
+          },
+          400: {
+            description: 'Bad Request - Dữ liệu không hợp lệ',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          403: {
+            description: 'Forbidden - Không có quyền update Agent Run này',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Agent Run không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      },
+      delete: {
+        tags: ['Agent Runs'],
+        summary: 'Xóa Agent Run (Soft Delete)',
+        description: 'Xóa một Agent Run theo ID. Thực hiện soft delete (set is_delete = true).',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'id',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của Agent Run'
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Agent Run được xóa thành công',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    message: { type: 'string' }
+                  }
+                }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          403: {
+            description: 'Forbidden - Không có quyền xóa Agent Run này',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Agent Run không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/runs/{id}/stats': {
+      get: {
+        tags: ['Agent Runs'],
+        summary: 'Lấy thống kê Agent Run theo thời gian',
+        description: 'Lấy thống kê Agent Run theo thời gian, bao gồm tổng số Agent Runs, số Agent Runs trong từng trạng thái, và trung bình độ tin cậy và độ phủ.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'id',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của Agent Run'
+          },
+          {
+            in: 'query',
+            name: 'range',
+            schema: { type: 'string', enum: ['day', 'week', 'month'] },
+            description: 'Khoảng thời gian để lấy thống kê (ngày, tuần, tháng)',
+            required: true
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Thống kê Agent Run theo thời gian',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AgentRunStats' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Agent Run không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/runs/{id}/logs': {
+      get: {
+        tags: ['Agent Runs'],
+        summary: 'Lấy log của Agent Run',
+        description: 'Lấy log của một Agent Run theo ID. Có thể lọc bởi level (debug, info, warn, error).',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'id',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của Agent Run'
+          },
+          {
+            in: 'query',
+            name: 'level',
+            schema: { type: 'string', enum: ['debug', 'info', 'warn', 'error'] },
+            description: 'Level của log (để lọc)',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'limit',
+            schema: { type: 'integer', minimum: 1, maximum: 100, default: 10 },
+            description: 'Số lượng kết quả trả về',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'offset',
+            schema: { type: 'integer', default: 0 },
+            description: 'Số lượng kết quả để bỏ qua',
+            required: false
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Log của Agent Run',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    data: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/RunLog' }
+                    },
+                    pagination: { $ref: '#/components/schemas/PaginationResponse' }
+                  }
+                }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Agent Run không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/runs/{id}/status': {
+      put: {
+        tags: ['Agent Runs'],
+        summary: 'Cập nhật trạng thái của Agent Run',
+        description: 'Cập nhật trạng thái, state, và kết quả của một Agent Run. Chỉ có thể cập nhật các trường được phép.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'id',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của Agent Run'
+          }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/AgentRunUpdateRequest' }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: 'Agent Run được cập nhật thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AgentRun' }
+              }
+            }
+          },
+          400: {
+            description: 'Bad Request - Dữ liệu không hợp lệ',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          403: {
+            description: 'Forbidden - Không có quyền update Agent Run này',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Agent Run không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/runs/stats/summary': {
+      get: {
+        tags: ['Agent Runs'],
+        summary: 'Lấy thống kê tổng quan về Agent Runs',
+        description: 'Lấy thống kê tổng quan về Agent Runs, bao gồm tổng số, số lượng theo trạng thái, và metrics trung bình.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'query',
+            name: 'projectId',
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của project (để lọc)',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'fromDate',
+            schema: { type: 'string', format: 'date-time' },
+            description: 'Ngày bắt đầu (để lọc)',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'toDate',
+            schema: { type: 'string', format: 'date-time' },
+            description: 'Ngày kết thúc (để lọc)',
+            required: false
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Thống kê tổng quan về Agent Runs',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AgentRunStats' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    // Queue endpoints
+    '/queue/messages': {
+      get: {
+        tags: ['Queue Management'],
+        summary: 'Lấy danh sách message từ hàng đợi',
+        description: 'Lấy danh sách message từ hàng đợi. Có thể lọc bởi status, type, projectId và userId.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'query',
+            name: 'status',
+            schema: { type: 'string', enum: ['queued', 'pending', 'processing', 'acknowledged', 'nack', 'deleted', 'cleared'] },
+            description: 'Trạng thái của message (để lọc)',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'type',
+            schema: { type: 'string' },
+            description: 'Loại của message (để lọc)',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'projectId',
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của project (để lọc)',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'userId',
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của user (để lọc)',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'limit',
+            schema: { type: 'integer', minimum: 1, maximum: 100, default: 10 },
+            description: 'Số lượng kết quả trả về',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'offset',
+            schema: { type: 'integer', default: 0 },
+            description: 'Số lượng kết quả để bỏ qua',
+            required: false
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Danh sách message từ hàng đợi',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    data: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/QueueMessage' }
+                    },
+                    pagination: { $ref: '#/components/schemas/PaginationResponse' }
+                  }
+                }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      },
+      post: {
+        tags: ['Queue Management'],
+        summary: 'Đẩy message vào hàng đợi',
+        description: 'Đẩy message vào hàng đợi. Có thể chỉ định priority và delay.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/QueueEnqueueRequest' }
+            }
+          }
+        },
+        responses: {
+          201: {
+            description: 'Message được đẩy vào hàng đợi thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/QueueMessage' }
+              }
+            }
+          },
+          400: {
+            description: 'Bad Request - Dữ liệu không hợp lệ',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/queue/messages/{id}': {
+      get: {
+        tags: ['Queue Management'],
+        summary: 'Lấy message từ hàng đợi theo ID',
+        description: 'Lấy thông tin chi tiết của một message từ hàng đợi theo ID.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'id',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của message'
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Thông tin message từ hàng đợi',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/QueueMessage' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Message không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      },
+      put: {
+        tags: ['Queue Management'],
+        summary: 'Xác nhận message từ hàng đợi',
+        description: 'Xác nhận một message đã được xử lý thành công từ hàng đợi.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'id',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của message'
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Message được xác nhận thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/SuccessResponse' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Message không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      },
+      delete: {
+        tags: ['Queue Management'],
+        summary: 'Xóa message từ hàng đợi (Soft Delete)',
+        description: 'Xóa một message từ hàng đợi theo ID. Thực hiện soft delete (set is_delete = true).',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'id',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của message'
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Message được xóa thành công',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    message: { type: 'string' }
+                  }
+                }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Message không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/queue/messages/clear': {
+      post: {
+        tags: ['Queue Management'],
+        summary: 'Xóa nhiều message từ hàng đợi',
+        description: 'Xóa nhiều message từ hàng đợi theo trạng thái và loại. Có thể chỉ định projectId để xóa trong một project cụ thể.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/QueueClearRequest' }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: 'Message được xóa thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/SuccessResponse' }
+              }
+            }
+          },
+          400: {
+            description: 'Bad Request - Dữ liệu không hợp lệ',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    // Queue Management endpoints
+    '/queue/status': {
+      get: {
+        tags: ['Queue Management'],
+        summary: 'Kiểm tra trạng thái của queue',
+        description: 'Kiểm tra trạng thái tổng quan của queue system',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Trạng thái queue',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    data: { type: 'object' }
+                  }
+                }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/queue/dequeue': {
+      post: {
+        tags: ['Queue Management'],
+        summary: 'Lấy message từ queue',
+        description: 'Lấy message từ queue để xử lý',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/QueueDequeueRequest' }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: 'Message được lấy từ queue',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/QueueMessage' }
+              }
+            }
+          },
+          204: {
+            description: 'Không có message nào trong queue'
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/queue/messages/{messageId}/ack': {
+      post: {
+        tags: ['Queue Management'],
+        summary: 'Xác nhận message đã xử lý thành công',
+        description: 'Xác nhận một message đã được xử lý thành công',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'messageId',
+            required: true,
+            schema: { type: 'string' },
+            description: 'ID của message'
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Message được xác nhận thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/SuccessResponse' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Message không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/queue/messages/{messageId}/nack': {
+      post: {
+        tags: ['Queue Management'],
+        summary: 'Xác nhận message xử lý thất bại',
+        description: 'Xác nhận một message đã được xử lý thất bại',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'messageId',
+            required: true,
+            schema: { type: 'string' },
+            description: 'ID của message'
+          }
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/QueueNackRequest' }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: 'Message được nack thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/SuccessResponse' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Message không tồn tại',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/queue/history': {
+      get: {
+        tags: ['Queue Management'],
+        summary: 'Lấy lịch sử queue messages',
+        description: 'Lấy lịch sử các queue messages đã xử lý',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'query',
+            name: 'limit',
+            schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 },
+            description: 'Số lượng kết quả trả về',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'offset',
+            schema: { type: 'integer', default: 0 },
+            description: 'Số lượng kết quả để bỏ qua',
+            required: false
+          },
+          {
+            in: 'query',
+            name: 'status',
+            schema: { type: 'string', enum: ['acknowledged', 'nack', 'deleted'] },
+            description: 'Trạng thái message để lọc',
+            required: false
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Lịch sử queue messages',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    data: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/QueueMessage' }
+                    },
+                    pagination: { $ref: '#/components/schemas/PaginationResponse' }
+                  }
+                }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/queue/clear': {
+      post: {
+        tags: ['Queue Management'],
+        summary: 'Xóa tất cả messages trong queue',
+        description: 'Xóa tất cả messages trong queue (emergency cleanup)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Queue được clear thành công',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/SuccessResponse' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    // Stats API endpoints
+    '/stats/summary': {
+      get: {
+        tags: ['Statistics'],
+        summary: 'Lấy thống kê tổng quan',
+        description: 'Lấy thống kê tổng quan về runs, projects và performance theo khoảng thời gian',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'query',
+            name: 'range',
+            schema: { type: 'string', enum: ['24h', '7d', '30d', '90d'], default: '7d' },
+            description: 'Khoảng thời gian để lấy thống kê',
+            required: false
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Thống kê tổng quan',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/StatsSummary' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/stats/projects/{id}/summary': {
+      get: {
+        tags: ['Statistics'],
+        summary: 'Lấy thống kê cho project cụ thể',
+        description: 'Lấy thống kê chi tiết cho một project cụ thể theo khoảng thời gian',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'path',
+            name: 'id',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+            description: 'ID của project'
+          },
+          {
+            in: 'query',
+            name: 'range',
+            schema: { type: 'string', enum: ['24h', '7d', '30d', '90d'], default: '7d' },
+            description: 'Khoảng thời gian để lấy thống kê',
+            required: false
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Thống kê cho project',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ProjectStatsSummary' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Project không tìm thấy',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    '/stats/trends': {
+      get: {
+        tags: ['Statistics'],
+        summary: 'Lấy dữ liệu xu hướng',
+        description: 'Lấy dữ liệu xu hướng và moving average cho các metrics theo thời gian',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: 'query',
+            name: 'days',
+            schema: { type: 'integer', minimum: 7, maximum: 90, default: 30 },
+            description: 'Số ngày để lấy dữ liệu xu hướng',
+            required: false
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Dữ liệu xu hướng',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/TrendsData' }
+              }
+            }
+          },
+          401: {
+            description: 'Unauthorized - Cần JWT token',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/ErrorResponse' }

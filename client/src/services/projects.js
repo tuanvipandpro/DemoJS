@@ -1,4 +1,4 @@
-import { api } from './auth/apiClient';
+import { api } from './auth/apiClient.js';
 
 const PROJECTS_API = '/projects';
 

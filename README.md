@@ -184,7 +184,9 @@ Hệ thống InsightTestAI bao gồm 5 khối chính:
 - `POST /api/projects/:id/runs`  
 - `GET /api/runs/:id`  
 - `GET /api/runs/:id/logs`  
-- `GET /api/stats/summary?range=7d`  
+- `GET /api/stats/summary?range=7d` - Thống kê tổng quan với các tham số: 24h, 7d, 30d, 90d
+- `GET /api/stats/projects/:id/summary?range=7d` - Thống kê chi tiết cho project cụ thể
+- `GET /api/stats/trends?days=30` - Dữ liệu xu hướng và moving average
 ---
 
 ## 6. MCP List (Tools)

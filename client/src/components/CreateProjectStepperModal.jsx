@@ -49,7 +49,7 @@ import {
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { api } from '../services/auth/apiClient';
+import { api } from '../services/auth/apiClient.js';
 
 const steps = [
   {

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api, bindApiErrorHandler } from '../services/auth/apiClient';
+import { api, bindApiErrorHandler } from '../services/auth/apiClient.js';
 import { useError } from './ErrorContext';
 import { getAccessToken, setAccessToken, setRefreshToken, clearAllAuthLike } from '../services/auth/tokenStorage';
 
@@ -25,11 +25,11 @@ export const AuthProvider = ({ children }) => {
     if (!token) return;
     (async () => {
       try {
-        const res = await api.get('/auth/me');
+        const res = await api.get('/auth/profile');
         if (res.status === 200) {
           const data = res.data;
-          setUser(data.user || null);
-          setIsAuthenticated(!!data.user);
+          setUser(data.profile || null);
+          setIsAuthenticated(!!data.profile);
         } else {
           setUser(null);
           setIsAuthenticated(false);
@@ -50,10 +50,10 @@ export const AuthProvider = ({ children }) => {
         if (tokens.access_token) setAccessToken(tokens.access_token);
         if (tokens.refresh_token) setRefreshToken(tokens.refresh_token);
         setIsAuthenticated(true);
-        const meRes = await api.get('/auth/me');
+        const meRes = await api.get('/auth/profile');
         if (meRes.status === 200) {
           const me = meRes.data;
-          setUser(me.user || null);
+          setUser(me.profile || null);
         }
         return { success: true };
       } else {

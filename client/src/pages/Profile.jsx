@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Paper, Typography, Divider, TextField, Button, Alert, Stack } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
-import { api } from '../services/auth/apiClient';
+import { api } from '../services/auth/apiClient.js';
 
 const Profile = () => {
   const { user } = useAuth();

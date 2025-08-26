@@ -10,6 +10,10 @@ import authRouter from './routes/auth.js';
 import vectorsRouter from './routes/vectors.js';
 import projectsRouter from './routes/projects.js';
 import githubRouter from './routes/github.js';
+import workerRouter from './routes/worker.js';
+import runsRouter from './routes/runs.js';
+import queueRouter from './routes/queue.js';
+import statsRouter from './routes/stats.js';
 import { openApiSpec } from './swagger.js';
 import swaggerUi from 'swagger-ui-express';
 import { logger } from './utils/logger.js';
@@ -65,6 +69,10 @@ app.use('/api/auth', authRouter);
 app.use('/api/vectors', vectorsRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/github', githubRouter);
+app.use('/api/worker', workerRouter);
+app.use('/api/runs', runsRouter);
+app.use('/api/queue', queueRouter);
+app.use('/api/stats', statsRouter);
 app.get('/api/docs.json', (_req, res) => res.json(openApiSpec));
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
@@ -81,6 +89,16 @@ initializeDatabase()
       const displayHost = host === '0.0.0.0' ? 'localhost' : host;
       logger.info(`Server listening on ${displayHost}:${port}`);
       logger.info(`Swagger UI: http://${displayHost}:${port}/api/docs`);
+      logger.info('Available API endpoints:');
+      logger.info('  - /api/health - Health check');
+      logger.info('  - /api/auth - Authentication');
+      logger.info('  - /api/vectors - Vector operations');
+      logger.info('  - /api/projects - Project management');
+      logger.info('  - /api/github - GitHub integration');
+      logger.info('  - /api/worker - Worker integration');
+      logger.info('  - /api/runs - Agent runs management');
+      logger.info('  - /api/queue - Queue management');
+      logger.info('  - /api/stats - Statistics and analytics');
     });
   })
   .catch((error) => {
