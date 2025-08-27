@@ -1,7 +1,7 @@
 import { StateMachine, FSM_STATES } from './core/stateMachine.js';
 import { QueueFactory } from './queue/queueFactory.js';
 import { MCPClient, ToolHelpers } from './tools/mcpClient.js';
-import { LLMServiceFactory } from './services/llmService.js';
+import { LLMFactory } from './services/llm/LLMFactory.js';
 import config from './config/env.js';
 import { logger } from './utils/logger.js';
 
@@ -71,8 +71,9 @@ export class OrchestratorWorker {
       this.logger.info('✅ Connected to MCP server');
 
       // Initialize LLM service
-      this.llmService = LLMServiceFactory.createService();
-      this.logger.info(`✅ LLM service initialized with provider: ${config.llm.provider}`);
+      this.llmService = LLMFactory.createDefaultLLMService();
+      await this.llmService.initialize();
+      this.logger.info(`✅ LLM service initialized with provider: ${this.llmService.constructor.name}`);
 
       // Setup queue event listeners
       this.setupQueueEventListeners();

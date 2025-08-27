@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api, bindApiErrorHandler } from '../services/auth/apiClient.js';
 import { useError } from './ErrorContext';
 import { getAccessToken, setAccessToken, setRefreshToken, clearAllAuthLike } from '../services/auth/tokenStorage';
@@ -19,27 +19,38 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    bindApiErrorHandler(showError);
+  const checkAuth = useCallback(async () => {
     const token = getAccessToken();
-    if (!token) return;
-    (async () => {
-      try {
-        const res = await api.get('/auth/profile');
-        if (res.status === 200) {
-          const data = res.data;
-          setUser(data.profile || null);
-          setIsAuthenticated(!!data.profile);
-        } else {
-          setUser(null);
-          setIsAuthenticated(false);
-        }
-      } catch (_e) {
+    if (!token) {
+      setUser(null);
+      setIsAuthenticated(false);
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const res = await api.get('/auth/profile');
+      if (res.status === 200) {
+        const data = res.data;
+        setUser(data.profile || null);
+        setIsAuthenticated(!!data.profile);
+      } else {
         setUser(null);
         setIsAuthenticated(false);
       }
-    })();
+    } catch (_e) {
+      setUser(null);
+      setIsAuthenticated(false);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    bindApiErrorHandler(showError);
+    checkAuth();
+  }, [showError, checkAuth]);
 
   const login = async (username, password) => {
     try {

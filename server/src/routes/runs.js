@@ -1,7 +1,7 @@
 import express from 'express';
 import { logger } from '../utils/logger.js';
 import { pool } from '../db/init.js';
-import { ensureAuthenticated, checkProjectAccess } from '../middleware/auth.js';
+import { ensureAuthenticated, checkProjectAccessById } from '../middleware/auth.js';
 import axios from 'axios';
 
 const router = express.Router();
@@ -157,7 +157,7 @@ router.get('/:id', async (req, res) => {
     const run = result.rows[0];
     
     // Kiểm tra quyền truy cập project
-    const hasAccess = await checkProjectAccess(req.user.id, run.project_id);
+    const hasAccess = await checkProjectAccessById(req.user.id, run.project_id);
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
@@ -220,7 +220,7 @@ router.post('/', async (req, res) => {
     }
     
     // Kiểm tra quyền truy cập project
-    const hasAccess = await checkProjectAccess(req.user.id, projectId);
+    const hasAccess = await checkProjectAccessById(req.user.id, projectId);
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
@@ -339,7 +339,7 @@ router.put('/:id/status', async (req, res) => {
     const run = runResult.rows[0];
     
     // Kiểm tra quyền truy cập project
-    const hasAccess = await checkProjectAccess(req.user.id, run.project_id);
+    const hasAccess = await checkProjectAccessById(req.user.id, run.project_id);
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
@@ -444,7 +444,7 @@ router.delete('/:id', async (req, res) => {
     const run = runResult.rows[0];
     
     // Kiểm tra quyền truy cập project
-    const hasAccess = await checkProjectAccess(req.user.id, run.project_id);
+    const hasAccess = await checkProjectAccessById(req.user.id, run.project_id);
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
@@ -496,7 +496,7 @@ router.get('/:id/logs', async (req, res) => {
     const run = runResult.rows[0];
     
     // Kiểm tra quyền truy cập project
-    const hasAccess = await checkProjectAccess(req.user.id, run.project_id);
+    const hasAccess = await checkProjectAccessById(req.user.id, run.project_id);
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
@@ -576,7 +576,7 @@ router.get('/stats/summary', async (req, res) => {
       paramIndex++;
       
       // Kiểm tra quyền truy cập project
-      const hasAccess = await checkProjectAccess(req.user.id, projectId);
+      const hasAccess = await checkProjectAccessById(req.user.id, projectId);
       if (!hasAccess) {
         return res.status(403).json({
           success: false,

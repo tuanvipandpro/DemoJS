@@ -74,44 +74,10 @@ router.post('/repos', authenticateJWT, async (req, res) => {
       open_issues_count: repo.open_issues_count
     }));
 
-    // Lấy branches cho mỗi repository (chỉ lấy 5 repositories đầu tiên để tránh rate limit)
-    const reposWithBranches = [];
-    for (let i = 0; i < Math.min(transformedRepos.length, 5); i++) {
-      const repo = transformedRepos[i];
-      try {
-        const [owner, repoName] = repo.full_name.split('/');
-        const branchesResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/branches`, {
-          headers: {
-            'Authorization': `token ${token}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'InsightTestAI'
-          }
-        });
-        
-        if (branchesResponse.ok) {
-          const branches = await branchesResponse.json();
-          repo.branches = branches.map(branch => ({
-            name: branch.name,
-            commitSha: branch.commit.sha
-          }));
-          logger.info(`Successfully fetched ${repo.branches.length} branches for ${repo.full_name}`);
-        } else {
-          logger.warn(`Failed to fetch branches for ${repo.full_name}:`, {
-            status: branchesResponse.status,
-            statusText: branchesResponse.statusText
-          });
-          repo.branches = [];
-        }
-      } catch (error) {
-        logger.error(`Error fetching branches for ${repo.full_name}:`, error);
-        repo.branches = [];
-      }
-      reposWithBranches.push(repo);
-    }
-    
+    // Trả về tất cả repositories không có branches (sẽ được fetch riêng khi cần)
     const response = {
       success: true,
-      repositories: reposWithBranches
+      repositories: transformedRepos
     };
     
     // Log successful response
@@ -302,41 +268,6 @@ router.post('/connect-with-token', authenticateJWT, async (req, res) => {
       open_issues_count: repo.open_issues_count
     }));
 
-    // Lấy branches cho mỗi repository (chỉ lấy 5 repositories đầu tiên để tránh rate limit)
-    const reposWithBranches = [];
-    for (let i = 0; i < Math.min(transformedRepos.length, 5); i++) {
-      const repo = transformedRepos[i];
-      try {
-        const [owner, repoName] = repo.full_name.split('/');
-        const branchesResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/branches`, {
-          headers: {
-            'Authorization': `token ${token}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'InsightTestAI'
-          }
-        });
-        
-        if (branchesResponse.ok) {
-          const branches = await branchesResponse.json();
-          repo.branches = branches.map(branch => ({
-            name: branch.name,
-            commitSha: branch.commit.sha
-          }));
-          logger.info(`Successfully fetched ${repo.branches.length} branches for ${repo.full_name}`);
-        } else {
-          logger.warn(`Failed to fetch branches for ${repo.full_name}:`, {
-            status: branchesResponse.status,
-            statusText: branchesResponse.statusText
-          });
-          repo.branches = [];
-        }
-      } catch (error) {
-        logger.error(`Error fetching branches for ${repo.full_name}:`, error);
-        repo.branches = [];
-      }
-      reposWithBranches.push(repo);
-    }
-    
     const response = {
       success: true,
       user: {
@@ -353,7 +284,7 @@ router.post('/connect-with-token', authenticateJWT, async (req, res) => {
         followers: user.followers,
         following: user.following
       },
-      repositories: reposWithBranches
+      repositories: transformedRepos
     };
     
     // Log successful response

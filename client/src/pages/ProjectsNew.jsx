@@ -24,17 +24,21 @@ import {
   Select,
   MenuItem,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   Add as AddIcon,
   GitHub as GitHubIcon,
-  Description as ReportIcon,
+  PlayArrow as RunIcon,
   Info as DetailIcon,
 } from '@mui/icons-material';
 import CreateProjectStepperModal from '../components/CreateProjectStepperModal';
-import TestReportModal from '../components/TestReportModal';
 import ProjectDetailModal from '../components/ProjectDetailModal';
 import { projectsService } from '../services/projects';
+import { api } from '../services/auth/apiClient';
 
 const ProjectsNew = ({ onNavigate }) => {
   const [projects, setProjects] = useState([]);
@@ -55,8 +59,9 @@ const ProjectsNew = ({ onNavigate }) => {
     window.addEventListener('app:openCreateProject', onOpenCreateProject);
     return () => window.removeEventListener('app:openCreateProject', onOpenCreateProject);
   }, []);
-  const [reportModal, setReportModal] = useState({ open: false, report: null, projectName: '' });
+
   const [detailModal, setDetailModal] = useState({ open: false, project: null });
+  const [confirmRunModal, setConfirmRunModal] = useState({ open: false, project: null });
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -106,77 +111,65 @@ const ProjectsNew = ({ onNavigate }) => {
     }
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'High':
-      case 'Critical':
-        return 'error';
-      case 'Medium':
-        return 'warning';
-      case 'Low':
-        return 'success';
+  const getProviderIcon = (provider) => {
+    switch (provider) {
+      case 'GitHub':
+        return <GitHubIcon fontSize="small" />;
       default:
-        return 'default';
+        return null;
     }
   };
 
   const handleCreateProject = async (projectData) => {
     try {
-      const response = await projectsService.createProject({
-        name: projectData.name,
-        description: projectData.description,
-        startDate: projectData.startDate,
-        endDate: projectData.endDate,
-        team: projectData.team || 'Default Team',
-        priority: projectData.priority || 'Medium',
-        budget: projectData.budget || '$0',
-        gitProvider: projectData.gitProvider || '',
-        repository: projectData.repository || projectData.selectedRepository || '',
-        branch: projectData.branch || '',
-        notifications: projectData.selectedNotifications || [],
-        personalAccessToken: projectData.personalAccessToken || null // Lưu GitHub token
-      });
-
+      const response = await projectsService.createProject(projectData);
+      
       if (response.success) {
-        const newProject = response.project;
-        
-        setProjects([newProject, ...projects]);
         setSnackbar({
           open: true,
-          message: `Project "${newProject.name}" created successfully!`,
+          message: 'Project created successfully!',
           severity: 'success',
         });
         
-        // Reload projects to get fresh data
+        // Refresh projects list
         loadProjects();
+        
+        // Close modal
+        setOpenModal(false);
       } else {
-        throw new Error('Failed to create project');
+        throw new Error(response.error || 'Failed to create project');
       }
-      
-    } catch (err) {
-      console.error('Failed to create project:', err);
+    } catch (error) {
+      console.error('Error creating project:', error);
       setSnackbar({
         open: true,
-        message: `Failed to create project: ${err.message}`,
+        message: error.message || 'Failed to create project',
         severity: 'error',
       });
     }
   };
 
-  const handleDeleteProject = async (projectId) => {
+  const handleDeleteProject = async (id) => {
     try {
-      await projectsService.deleteProject(projectId);
-      setProjects(projects.filter(project => project.id !== projectId));
+      const response = await projectsService.deleteProject(id);
+      
+      if (response.success) {
+        setSnackbar({
+          open: true,
+          message: 'Project deleted successfully!',
+          severity: 'success',
+        });
+        
+        // Refresh projects list
+        loadProjects();
+      } else {
+        throw new Error(response.error || 'Failed to delete project');
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error);
       setSnackbar({
         open: true,
-        message: 'Project deleted successfully!',
-        severity: 'success',
-      });
-    } catch (err) {
-      console.error('Failed to delete project:', err);
-      setSnackbar({
-        open: true,
-        message: `Failed to delete project: ${err.message}`,
+        message: error.message || 'Failed to delete project',
         severity: 'error',
       });
     }
@@ -186,27 +179,48 @@ const ProjectsNew = ({ onNavigate }) => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  const openReport = (project) => {
+  const handleRunClick = (project) => {
+    if (project.lastRun === 'Running') return;
+    setConfirmRunModal({ open: true, project });
+  };
+
+  const runProject = async (project) => {
     if (project.lastRun === 'Running') return;
     
-    // For now, create a mock report
-    const status = project.lastRun && project.lastRun !== 'Not run' ? project.lastRun : 'Not run';
-    const coverageBefore = Math.max(0, (project.coverage || 0) - 1);
-    const mockReport = {
-      status,
-      total: 42,
-      passed: status === 'Passed' ? 41 : status === 'Failed' ? 37 : 0,
-      failed: status === 'Passed' ? 1 : status === 'Failed' ? 5 : 0,
-      duration: status === 'Not run' ? '—' : '1m 45s',
-      coverageBefore,
-      coverageAfter: project.coverage || 0,
-      failedTests: status === 'Failed' ? [
-        { name: 'critical flow should pass', error: 'AssertionError: expected true to be false' },
-      ] : [],
-      logs: status === 'Not run' ? 'No report available yet.' : '[INFO] Loaded cached report.',
-    };
-    
-    setReportModal({ open: true, report: mockReport, projectName: project.name });
+    try {
+      // Sử dụng api object để gọi backend với interceptors
+      const response = await api.post('/queue/enqueue', {
+        type: 'agent_run',
+        data: {
+          projectId: project.id,
+          commitId: 'main', // Sử dụng branch mặc định
+          branch: 'main',   // Sử dụng branch mặc định
+          diffSummary: null, // Không có diff summary cho lần chạy đầu tiên
+          priority: 'normal'
+        }
+      });
+
+      if (response.status === 200 || response.status === 201) {
+        const result = response.data;
+        setSnackbar({
+          open: true,
+          message: `Project ${project.name} queued successfully!`,
+          severity: 'success'
+        });
+        
+        // Refresh projects để cập nhật trạng thái
+        loadProjects();
+      } else {
+        throw new Error('Failed to enqueue project');
+      }
+    } catch (error) {
+      console.error('Error running project:', error);
+      setSnackbar({
+        open: true,
+        message: `Failed to run project: ${error.response?.data?.error || error.message}`,
+        severity: 'error'
+      });
+    }
   };
 
   const filteredProjects = useMemo(() => {
@@ -298,145 +312,40 @@ const ProjectsNew = ({ onNavigate }) => {
             </FormControl>
           </Grid>
         </Grid>
-        <Box sx={{ display: 'flex', gap: 1, mt: 2, justifyContent: 'space-between', flexWrap: 'wrap' }}>
-          <Typography variant="body2" color="textSecondary">
-            Auto-scan is enabled. New commits will trigger AI tests automatically.
-          </Typography>
-        </Box>
       </Paper>
-
-      {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Total Projects
-              </Typography>
-              <Typography variant="h4">
-                {projects.length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                In Progress
-              </Typography>
-              <Typography variant="h4">
-                {projects.filter(p => p.status === 'In Progress').length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Completed
-              </Typography>
-              <Typography variant="h4">
-                {projects.filter(p => p.status === 'Completed').length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Planning
-              </Typography>
-              <Typography variant="h4">
-                {projects.filter(p => p.status === 'Planning').length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
 
       {/* Projects Table */}
       <TableContainer component={Paper}>
         <Table>
-                     <TableHead>
-             <TableRow>
-               <TableCell>Project</TableCell>
-               <TableCell>Description</TableCell>
-               <TableCell>Provider</TableCell>
-               <TableCell>Repository</TableCell>
-               <TableCell>Branch</TableCell>
-               <TableCell>Connected</TableCell>
-               <TableCell>Notifications</TableCell>
-               <TableCell>Status</TableCell>
-               <TableCell>Progress</TableCell>
-               <TableCell>Coverage</TableCell>
-               <TableCell>Last Run</TableCell>
-               <TableCell align="center">Actions</TableCell>
-             </TableRow>
-           </TableHead>
+          <TableHead>
+            <TableRow>
+              <TableCell>Project</TableCell>
+              <TableCell>Team</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Provider</TableCell>
+              <TableCell>Coverage</TableCell>
+              <TableCell>Last Run</TableCell>
+              <TableCell align="center">Actions</TableCell>
+            </TableRow>
+          </TableHead>
           <TableBody>
             {filteredProjects.map((project) => (
-              <TableRow key={project.id}>
+              <TableRow key={project.id} hover>
                 <TableCell>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                    {project.name}
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      {project.name}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+                      {project.description || 'No description'}
+                    </Typography>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2">
+                    {project.team || 'No team'}
                   </Typography>
                 </TableCell>
-                <TableCell>
-                  <Typography variant="body2" color="textSecondary" sx={{ maxWidth: 200 }}>
-                    {project.description}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  {project.gitProvider ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <GitHubIcon fontSize="small" />
-                      <Typography variant="body2">{project.gitProvider}</Typography>
-                    </Box>
-                  ) : (
-                    <Typography variant="body2" color="textSecondary">—</Typography>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2">{project.repository || project.selectedRepository || '—'}</Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2">{project.branch || '—'}</Typography>
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={project.gitProvider && (project.repository || project.selectedRepository) ? 'Connected' : 'Not connected'}
-                    color={project.gitProvider && (project.repository || project.selectedRepository) ? 'success' : 'default'}
-                    size="small"
-                  />
-                </TableCell>
-                 <TableCell>
-                   {project.notifications && project.notifications.length > 0 ? (
-                     <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                       {project.notifications.slice(0, 2).map((notification) => (
-                         <Chip
-                           key={notification}
-                           label={notification}
-                           size="small"
-                           variant="outlined"
-                         />
-                       ))}
-                       {project.notifications.length > 2 && (
-                         <Chip
-                           label={`+${project.notifications.length - 2}`}
-                           size="small"
-                           variant="outlined"
-                         />
-                       )}
-                     </Box>
-                   ) : (
-                     <Typography variant="body2" color="textSecondary">
-                       None
-                     </Typography>
-                   )}
-                 </TableCell>
                 <TableCell>
                   <Chip
                     label={project.status}
@@ -446,34 +355,31 @@ const ProjectsNew = ({ onNavigate }) => {
                 </TableCell>
                 <TableCell>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {getProviderIcon(project.gitProvider)}
+                    <Typography variant="body2">
+                      {project.gitProvider || 'Not connected'}
+                    </Typography>
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Box sx={{ position: 'relative', width: 60, height: 60 }}>
                     <Box
                       sx={{
-                        width: 60,
-                        height: 8,
-                        bgcolor: 'grey.200',
-                        borderRadius: 1,
-                        overflow: 'hidden',
+                        position: 'absolute',
+                        inset: 0,
+                        borderRadius: '50%',
+                        background: `conic-gradient(#4caf50 0deg ${(project.coverage || 0) * 3.6}deg, #e0e0e0 ${(project.coverage || 0) * 3.6}deg 360deg)`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
                       <Box
                         sx={{
-                          width: `${project.progress}%`,
-                          height: '100%',
-                          bgcolor: project.status === 'Completed' ? '#2e7d32' : '#1976d2',
-                        }}
-                      />
-                    </Box>
-                    <Typography variant="body2">{project.progress}%</Typography>
-                  </Box>
-                </TableCell>
-                <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', minWidth: 64 }}>
-                    <Box sx={{ position: 'relative', width: 36, height: 36, display: 'inline-flex' }}>
-                      <CircularProgress variant="determinate" value={project.coverage || 0} size={36} thickness={5} />
-                      <Box
-                        sx={{
                           position: 'absolute',
-                          inset: 0,
+                          inset: 4,
+                          borderRadius: '50%',
+                          background: 'white',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -495,15 +401,16 @@ const ProjectsNew = ({ onNavigate }) => {
                 </TableCell>
                 <TableCell align="center">
                   <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                    {/* Auto scan enabled: remove manual run button */}
-                    <Tooltip title="View Report">
+                    {/* Run button */}
+                    <Tooltip title="Run Project">
                       <span>
                         <IconButton
                           size="small"
-                          onClick={() => openReport(project)}
+                          onClick={() => handleRunClick(project)}
                           disabled={project.lastRun === 'Running'}
+                          color="primary"
                         >
-                          <ReportIcon />
+                          <RunIcon />
                         </IconButton>
                       </span>
                     </Tooltip>
@@ -543,13 +450,42 @@ const ProjectsNew = ({ onNavigate }) => {
         </Alert>
       </Snackbar>
 
-      {/* Test Report Modal */}
-      <TestReportModal
-        open={reportModal.open}
-        onClose={() => setReportModal({ open: false, report: null, projectName: '' })}
-        report={reportModal.report}
-        projectName={reportModal.projectName}
-      />
+
+
+      {/* Confirm Run Modal */}
+      <Dialog
+        open={confirmRunModal.open}
+        onClose={() => setConfirmRunModal({ open: false, project: null })}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Xác nhận chạy Project</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Bạn có chắc chắn muốn chạy project <strong>{confirmRunModal.project?.name}</strong>?
+          </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+            Project sẽ được thêm vào queue và chạy theo thứ tự ưu tiên.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmRunModal({ open: false, project: null })}>
+            Hủy
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (confirmRunModal.project) {
+                runProject(confirmRunModal.project);
+                setConfirmRunModal({ open: false, project: null });
+              }
+            }}
+            startIcon={<RunIcon />}
+          >
+            Chạy Project
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Project Detail Modal (includes edit/delete) */}
       <ProjectDetailModal

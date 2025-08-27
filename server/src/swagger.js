@@ -604,37 +604,7 @@ export const openApiSpec = {
       }
     },
     
-    // Authentication endpoints
-    '/auth/me': {
-      get: {
-        tags: ['Authentication'],
-        summary: 'Thông tin user hiện tại',
-        description: 'Lấy thông tin user đang đăng nhập (session hoặc JWT)',
-        responses: {
-          200: { 
-            description: 'Thông tin user hoặc null nếu chưa đăng nhập',
-            content: {
-              'application/json': {
-                schema: {
-                  oneOf: [
-                    { $ref: '#/components/schemas/User' },
-                    { type: 'object', properties: { user: { type: 'null' } } }
-                  ]
-                }
-              }
-            }
-          },
-          401: { 
-            description: 'Unauthorized',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' }
-              }
-            }
-          }
-        }
-      }
-    },
+    // Authentication endpoints - /auth/me đã được loại bỏ, sử dụng /auth/profile thay thế
     
     '/auth/register': {
       post: {

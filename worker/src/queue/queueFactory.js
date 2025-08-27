@@ -1,5 +1,6 @@
 import { LocalQueue } from './localQueue.js';
 import { SQSQueue } from './sqsQueue.js';
+import { RedisQueue } from './redisQueue.js';
 import config from '../config/env.js';
 
 /**
@@ -32,8 +33,14 @@ export class QueueFactory {
         });
         
       case 'redis':
-        // Redis queue implementation would go here
-        throw new Error('Redis queue not yet implemented');
+        return new RedisQueue({
+          name: options.name || 'redis-queue',
+          host: config.queue.redis?.host || process.env.REDIS_HOST || 'localhost',
+          port: config.queue.redis?.port || process.env.REDIS_PORT || 6379,
+          password: config.queue.redis?.password || process.env.REDIS_PASSWORD,
+          db: config.queue.redis?.db || 0,
+          ...options
+        });
         
       default:
         throw new Error(`Unsupported queue type: ${queueType}`);

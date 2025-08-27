@@ -49,7 +49,17 @@ router.get('/', async (req, res) => {
       branch: project.branch,
       ownerId: project.owner_id,
       personalAccessToken: project.personal_access_token ? '***ENCRYPTED***' : null,
-      notifications: project.notifications ? (typeof project.notifications === 'string' ? JSON.parse(project.notifications) : project.notifications) : [],
+      notifications: (() => {
+        try {
+          if (project.notifications) {
+            return typeof project.notifications === 'string' ? JSON.parse(project.notifications) : project.notifications;
+          }
+          return [];
+        } catch (parseError) {
+          logger.warn('Failed to parse notifications JSON, using empty array:', parseError.message);
+          return [];
+        }
+      })(),
       createdAt: project.created_at,
       isDelete: project.is_delete,
       isDisabled: project.is_disabled,
@@ -124,7 +134,7 @@ router.post('/', async (req, res) => {
     const params = [
       name, description, gitProvider, encryptedToken,
       repository, branch, ownerId,
-      notifications ? JSON.stringify(notifications) : '[]'
+      notifications ? JSON.stringify(notifications) : '{}'
     ];
     
     const result = await pool.query(query, params);
@@ -133,7 +143,9 @@ router.post('/', async (req, res) => {
     // Log saved project
     logger.info('Project created successfully:', {
       id: newProject.id,
-      hasPersonalAccessToken: !!newProject.personal_access_token
+      hasPersonalAccessToken: !!newProject.personal_access_token,
+      notifications: newProject.notifications,
+      notificationsType: typeof newProject.notifications
     });
     
     // Format response - trả về personalAccessToken đã mã hóa
@@ -146,7 +158,14 @@ router.post('/', async (req, res) => {
       branch: newProject.branch,
       ownerId: newProject.owner_id,
       personalAccessToken: newProject.personal_access_token ? '***ENCRYPTED***' : null,
-      notifications: newProject.notifications ? JSON.parse(newProject.notifications) : [],
+      notifications: (() => {
+        try {
+          return newProject.notifications ? JSON.parse(newProject.notifications) : [];
+        } catch (parseError) {
+          logger.warn('Failed to parse notifications JSON, using empty array:', parseError.message);
+          return [];
+        }
+      })(),
       createdAt: newProject.created_at,
       isDelete: newProject.is_delete,
       isDisabled: newProject.is_disabled,
@@ -193,7 +212,14 @@ router.get('/:id', checkProjectAccess, async (req, res) => {
       branch: project.branch,
       ownerId: project.owner_id,
       personalAccessToken: project.personal_access_token ? '***ENCRYPTED***' : null,
-      notifications: project.notifications ? JSON.parse(project.notifications) : [],
+      notifications: (() => {
+        try {
+          return project.notifications ? JSON.parse(project.notifications) : [];
+        } catch (parseError) {
+          logger.warn('Failed to parse notifications JSON, using empty array:', parseError.message);
+          return [];
+        }
+      })(),
       createdAt: project.created_at,
       isDelete: project.is_delete,
       isDisabled: project.is_disabled,
@@ -274,7 +300,14 @@ router.put('/:id', checkProjectAccess, async (req, res) => {
       branch: updatedProject.branch,
       ownerId: updatedProject.owner_id,
       personalAccessToken: updatedProject.personal_access_token ? '***ENCRYPTED***' : null,
-      notifications: updatedProject.notifications ? JSON.parse(updatedProject.notifications) : [],
+      notifications: (() => {
+        try {
+          return updatedProject.notifications ? JSON.parse(updatedProject.notifications) : [];
+        } catch (parseError) {
+          logger.warn('Failed to parse notifications JSON, using empty array:', parseError.message);
+          return [];
+        }
+      })(),
       createdAt: updatedProject.created_at,
       isDelete: updatedProject.is_delete,
       isDisabled: updatedProject.is_disabled,
@@ -403,7 +436,14 @@ router.patch('/:id/status', checkProjectAccess, async (req, res) => {
       branch: updatedProject.branch,
       ownerId: updatedProject.owner_id,
       personalAccessToken: updatedProject.personal_access_token ? '***ENCRYPTED***' : null,
-      notifications: updatedProject.notifications ? JSON.parse(updatedProject.notifications) : [],
+      notifications: (() => {
+        try {
+          return updatedProject.notifications ? JSON.parse(updatedProject.notifications) : [];
+        } catch (parseError) {
+          logger.warn('Failed to parse notifications JSON, using empty array:', parseError.message);
+          return [];
+        }
+      })(),
       createdAt: updatedProject.created_at,
       isDelete: updatedProject.is_delete,
       isDisabled: updatedProject.is_disabled,

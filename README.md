@@ -207,9 +207,44 @@ Hệ thống InsightTestAI bao gồm 5 khối chính:
 
 ---
 
-## 8. Demo Flow
+## 8. Redis Queue & Dependency Injection
 
-### 8.1 Live Demo Flow (User tạo Project và Trigger Agent Run)
+### 8.1 Redis Queue System
+- **Development Mode**: Sử dụng Redis làm queue system
+- **Production Mode**: Có thể chuyển sang AWS SQS
+- **Features**: Hỗ trợ priority (high, normal, low) và delay
+- **Configuration**: 
+  - `QUEUE_TYPE=redis` (default) hoặc `QUEUE_TYPE=sqs`
+  - `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`
+
+### 8.2 LLM Service DI
+- **Development Mode**: Sử dụng Google Gemini AI
+- **Production Mode**: Có thể chuyển sang AWS Bedrock
+- **Configuration**:
+  - `LLM_PROVIDER=gemini` (default) hoặc `LLM_PROVIDER=bedrock`
+  - `GEMINI_API_KEY` cho Gemini
+  - `AWS_REGION`, `BEDROCK_MODEL_ID` cho Bedrock
+
+### 8.3 Code Structure
+```
+src/services/
+├── queue/
+│   ├── IQueueService.js          # Interface
+│   ├── RedisQueueService.js      # Redis implementation
+│   ├── SQSQueueService.js        # SQS implementation (placeholder)
+│   └── QueueFactory.js           # Factory pattern
+└── llm/
+    ├── ILLMService.js            # Interface
+    ├── GeminiLLMService.js       # Gemini implementation
+    ├── BedrockLLMService.js      # Bedrock implementation (placeholder)
+    └── LLMFactory.js             # Factory pattern
+```
+
+---
+
+## 9. Demo Flow
+
+### 9.1 Live Demo Flow (User tạo Project và Trigger Agent Run)
 
 1. **User login**  
    - FE gọi `POST /api/auth/login`.  
@@ -227,14 +262,14 @@ Hệ thống InsightTestAI bao gồm 5 khối chính:
    - API tạo record run ở DB (state=QUEUED), enqueue message lên SQS.  
 
 4. **Orchestrator Worker xử lý**  
-   - Nhận message từ SQS.  
+   - Nhận message từ Redis Queue (dev) hoặc SQS (prod).  
    - Khởi chạy FSM:  
-     - **Planning**: gọi Bedrock → sinh test plan.  
+     - **Planning**: gọi LLM (Gemini/Bedrock) → sinh test plan.  
      - **Tooling**: gọi MCP `get_diff` → lấy diff code.  
      - **Tooling**: gọi MCP `run_ci` → chạy test container.  
      - **Observing**: lưu log, đọc kết quả test.  
      - **Adjusting**: nếu fail, retry hoặc fallback.  
-     - **Done/Error**: cập nhật state DB.  
+     - **Done/Error**: cập nhật state DB.
 
 5. **Thông báo**  
    - Worker gọi MCP `notify` → gửi Slack/GitHub Issue nếu có lỗi.  

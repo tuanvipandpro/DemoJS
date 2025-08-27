@@ -8,34 +8,7 @@ import { verifyLocalUser, registerLocalUser } from '../auth/providers/localProvi
 
 const router = Router();
 
-router.get('/me', async (req, res) => {
-  // JWT-based authentication only
-  try {
-    const token = extractBearerToken(req);
-    if (token) {
-      const payload = verifyToken(token);
-      // fetch user profile from DB for more details
-      const result = await pool.query(
-        `SELECT id, username, email, display_name FROM users WHERE id = $1`,
-        [payload.sub]
-      );
-      if (result.rowCount > 0) {
-        const row = result.rows[0];
-        return res.json({
-          user: {
-            id: row.id,
-            username: row.username,
-            email: row.email,
-            displayName: row.display_name,
-            provider: 'jwt',
-          },
-        });
-      }
-      return res.json({ user: { id: payload.sub, username: payload.username, provider: 'jwt' } });
-    }
-  } catch (_e) {}
-  return res.status(401).json({ user: null });
-});
+// API /auth/me đã được loại bỏ, sử dụng /auth/profile thay thế
 
 // Profile endpoints
 router.get('/profile', async (req, res) => {

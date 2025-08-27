@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 
 import { initializeDatabase } from './db/init.js';
+import { QueueFactory } from './services/queue/QueueFactory.js';
 
 import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.js';
@@ -83,7 +84,11 @@ app.get('/', (_req, res) => {
 const port = Number(process.env.PORT || 3001);
 const host = process.env.HOST || '0.0.0.0';
 
-initializeDatabase()
+// Initialize database and queue service
+Promise.all([
+  initializeDatabase(),
+  QueueFactory.createDefaultQueueService().connect()
+])
   .then(() => {
     app.listen(port, host, () => {
       const displayHost = host === '0.0.0.0' ? 'localhost' : host;
@@ -99,11 +104,23 @@ initializeDatabase()
       logger.info('  - /api/runs - Agent runs management');
       logger.info('  - /api/queue - Queue management');
       logger.info('  - /api/stats - Statistics and analytics');
+      logger.info('Redis queue initialized successfully');
     });
   })
   .catch((error) => {
-    logger.error('Failed to initialize database:', error);
+    logger.error('Failed to initialize services:', error);
     process.exit(1);
   });
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  process.exit(0);
+});
 
 

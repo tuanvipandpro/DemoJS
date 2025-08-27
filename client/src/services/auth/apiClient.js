@@ -68,8 +68,8 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Nếu lỗi 401 và chưa thử refresh
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Nếu lỗi 401 và chưa thử refresh, và KHÔNG phải là request refresh token
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/token/refresh')) {
       originalRequest._retry = true;
 
       console.log('Token expired, attempting to refresh...');
@@ -84,7 +84,8 @@ axiosInstance.interceptors.response.use(
         }
 
         console.log('Calling refresh token endpoint...');
-        const refreshResponse = await axiosInstance.post('/auth/token/refresh', {
+        // Sử dụng axios gốc thay vì axiosInstance để tránh vòng lặp
+        const refreshResponse = await axios.post(`${API_BASE}/auth/token/refresh`, {
           refresh_token: refresh
         });
 

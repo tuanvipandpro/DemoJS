@@ -1,4 +1,6 @@
 import { extractBearerToken, verifyToken } from '../utils/jwt.js';
+import { logger } from '../utils/logger.js';
+import { pool } from '../db/init.js';
 
 export function ensureAuthenticated(req, res, next) {
   // JWT-based authentication only
@@ -17,6 +19,7 @@ export function ensureAuthenticated(req, res, next) {
 
 /**
  * Middleware để kiểm tra xem user có quyền truy cập project không
+ * Sử dụng cho Express routes
  */
 export async function checkProjectAccess(req, res, next) {
   try {
@@ -55,5 +58,33 @@ export async function checkProjectAccess(req, res, next) {
       success: false,
       error: 'Access check failed'
     });
+  }
+}
+
+/**
+ * Function để kiểm tra quyền truy cập project
+ * Sử dụng cho việc kiểm tra quyền truy cập trong code
+ * @param {number} userId - ID của user
+ * @param {number} projectId - ID của project
+ * @returns {Promise<boolean>} True nếu có quyền truy cập
+ */
+export async function checkProjectAccessById(userId, projectId) {
+  try {
+    if (!userId || !projectId) {
+      return false;
+    }
+    
+    // Kiểm tra xem project có tồn tại và thuộc về user không
+    const checkQuery = 'SELECT owner_id FROM projects WHERE id = $1 AND is_delete = false';
+    const checkResult = await pool.query(checkQuery, [projectId]);
+    
+    if (checkResult.rows.length === 0) {
+      return false;
+    }
+    
+    return checkResult.rows[0].owner_id === userId;
+  } catch (error) {
+    logger.error('Project access check by ID error:', error);
+    return false;
   }
 }

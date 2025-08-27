@@ -61,6 +61,21 @@ function AppInner() {
     }
   };
 
+  // Hiển thị loading khi đang kiểm tra authentication
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        fontSize: '18px'
+      }}>
+        Loading...
+      </div>
+    );
+  }
+
   return (
     <ProtectedRoute>
       <Layout onNavigate={handleNavigate}>
