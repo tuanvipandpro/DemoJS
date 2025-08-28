@@ -68,8 +68,9 @@ export class RedisQueueService extends IQueueService {
 
   async enqueue(message) {
     try {
-      if (!this.redis || !this.redis.status === 'ready') {
-        throw new Error('Redis queue not connected');
+      // Check connection and try to reconnect if needed
+      if (!this.redis || this.redis.status !== 'ready') {
+        await this.connect();
       }
 
       const { type, data, priority = 'normal', delay = 0 } = message;
