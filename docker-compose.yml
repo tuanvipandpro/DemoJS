@@ -1,106 +1,73 @@
-version: "3.9"
+version: '3.9'
 
 services:
+  # PostgreSQL Database với pgvector extension
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: postgres-vector-db
-    restart: always
+    container_name: insighttestai-postgres
     environment:
-      POSTGRES_DB: ${DB_NAME:-insighttestai}
-      POSTGRES_USER: ${DB_USER:-insight}
-      POSTGRES_PASSWORD: ${DB_PASS:-insightp}
+      POSTGRES_DB: ${POSTGRES_DB:-insighttestai}
+      POSTGRES_USER: ${POSTGRES_USER:-insight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-insightp}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - "${PGDATA_PATH:-./db/data}:/var/lib/postgresql/data"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - insighttestai-network
-
-  redis:
-    image: redis:7-alpine
-    container_name: insighttestai-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      - ${PGDATA_PATH:-./db/data}:/var/lib/postgresql/data
+      - ./server/src/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     networks:
       - insighttestai-network
     restart: unless-stopped
 
-  # backend:
-  #   build:
-  #     context: ./server
-  #     dockerfile: Dockerfile
-  #   container_name: insighttestai-backend
-  #   restart: always
-  #   environment:
-  #     - NODE_ENV=${NODE_ENV:-development}
-  #     - PORT=${PORT:-3001}
-  #     - HOST=${HOST:-0.0.0.0}
-  #     - DB_HOST=${DB_HOST:-postgres}
-  #     - DB_PORT=${DB_PORT:-5432}
-  #     - DB_NAME=${DB_NAME:-insighttestai}
-  #     - DB_USER=${DB_USER:-insight}
-  #     - DB_PASS=${DB_PASS:-insightp}
-  #     - REDIS_HOST=${REDIS_HOST:-redis}
-  #     - REDIS_PORT=${REDIS_PORT:-6379}
-  #     - QUEUE_TYPE=${QUEUE_TYPE:-redis}
-  #     - LOG_LEVEL=${LOG_LEVEL:-debug}
-  #     - HTTP_LOG_REQUEST_BODY=${HTTP_LOG_REQUEST_BODY:-1}
-  #     - HTTP_LOG_RESPONSE_BODY=${HTTP_LOG_RESPONSE_BODY:-1}
-  #     - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173}
-  #     - TRUST_PROXY=${TRUST_PROXY:-1}
-  #   ports:
-  #     - "3001:3001"
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   networks:
-  #     - insighttestai-network
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 40s
+  # InsightTestAI Backend Server
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: insighttestai-server
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${SERVER_PORT:-3001}
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-insighttestai}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      - RAG_SERVICE_TYPE=${RAG_SERVICE_TYPE:-postgresql}
+      - LLM_SERVICE_TYPE=${LLM_SERVICE_TYPE:-mock}
+    ports:
+      - "${SERVER_PORT:-3001}:3001"
+    depends_on:
+      - postgres
+    networks:
+      - insighttestai-network
+    restart: unless-stopped
+    volumes:
+      - ./server:/app
+      - /app/node_modules
 
-  # frontend:
-  #   build:
-  #     context: ./client
-  #     dockerfile: Dockerfile
-  #   container_name: insighttestai-frontend
-  #   restart: always
-  #   environment:
-  #     - VITE_API_BASE=${VITE_API_BASE:-http://localhost:3001/api}
-  #   ports:
-  #     - "5173:5173"
-  #   depends_on:
-  #     backend:
-  #       condition: service_healthy
-  #   networks:
-  #     - insighttestai-network
-  #   volumes:
-  #     - ./client:/app
-  #     - /app/node_modules
+  # InsightTestAI Frontend Client
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: insighttestai-client
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:3001/api}
+    ports:
+      - "${CLIENT_PORT:-5173}:5173"
+    depends_on:
+      - server
+    networks:
+      - insighttestai-network
+    restart: unless-stopped
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
 
 networks:
   insighttestai-network:
     driver: bridge
-
-volumes:
-  postgres_data:
-  redis_data:

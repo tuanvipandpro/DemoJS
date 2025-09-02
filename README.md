@@ -1,282 +1,168 @@
-# 📄 InsightTestAI – Thiết kế Hệ Thống
+# InsightTestAI
 
-## 1. Yêu cầu & Mục tiêu
-- Phát hiện bug sớm thông qua phân tích commit và sinh test case tự động.  
-- Tích hợp vào GitHub (giai đoạn demo), mở rộng sang GitLab/Bitbucket/Azure DevOps trong tương lai.  
-- Cho phép quản lý Project, theo dõi **Agent Run** (quy trình tự động test).  
-- Có Dashboard hiển thị số liệu thống kê (7 ngày, 24h, biểu đồ pass/fail).  
-- Sử dụng **AWS Bedrock** làm LLM, **MCP Server** làm tool server (get diff, chạy test, report coverage…).  
-- Hệ thống có kiến trúc mở, có thể mở rộng sang nhiều provider.  
+InsightTestAI là một nền tảng tự động hóa testing thông minh, sử dụng AI để tạo và thực thi test cases dựa trên code changes và requirements.
 
----
+## 🚀 Tính năng chính
 
-## 2. Các Khái niệm Chính
+### 🔐 Authentication & Authorization
+- **JWT-based authentication** với refresh token
+- **Role-based access control** (owner, admin, member, viewer)
+- **Project ownership** - user tạo project tự động trở thành owner
 
-### 2.1 Agent Run  
-- Một lần chạy của Agent khi có commit mới hoặc khi user trigger.  
-- Bao gồm nhiều bước: **Planning → Tooling → Observing → Adjusting → Done/Error**.  
+### 📁 Project Management
+- **Tạo project** với thông tin cơ bản (tên, mô tả)
+- **Git integration** - liên kết với repository (tùy chọn)
+- **Notification channels** - email, Slack, Discord, hoặc không có
+- **Test instructions** - template có sẵn hoặc tùy chỉnh
 
-### 2.2 FSM (Finite State Machine)  
-- Máy trạng thái điều khiển vòng đời của **Agent Run**.  
-- Mỗi state có action cụ thể:  
-  - **Planning**: LLM phân tích commit/diff, tạo kế hoạch test.  
-  - **Tooling**: Gọi MCP để lấy diff, đọc guideline, chuẩn bị test.  
-  - **Observing**: Ghi nhận log, kết quả test.  
-  - **Adjusting**: Nếu fail → retry hoặc fallback.  
-  - **Done/Error**: Lưu kết quả.  
+### 🔗 Git Integration
+- **Git Providers** được quản lý từ database
+- **Self-hosted support** - hỗ trợ GitLab, Gitea, Gogs tự host
+- **Domain field** chỉ hiển thị khi provider là self-hosted
+- **Personal Access Token** để truy cập private repositories
 
-### 2.3 Orchestrator Worker  
-- Worker backend chạy liên tục, lắng nghe SQS.  
-- Khi có message → bắt đầu một **Agent Run FSM**.  
-- FSM sẽ điều phối call Bedrock, MCP, ghi log vào DB.  
-- Trạng thái cập nhật để FE hiển thị theo thời gian thực.  
+#### Git Providers được hỗ trợ:
+- **Cloud providers**: GitHub, GitLab, Bitbucket, Gitea
+- **Self-hosted**: GitLab, Gitea, Gogs
+- **Cấu hình**: Mỗi provider có domain và cờ `is_selfhost`
 
-### 2.4 MCP Server  
-- Cung cấp các “tool” mà LLM có thể gọi:  
-  - `get_diff`: Lấy diff từ GitHub API.  
-  - `run_ci`: Chạy test sandbox (Docker).  
-  - `notify`: Gửi Slack/GitHub Issue.  
-- Có thể tích hợp thêm tool tùy nhu cầu.  
+### 👥 Team Collaboration
+- **Project members** - owner có thể thêm/xóa thành viên
+- **Role management** - owner, admin, member, viewer
+- **Permission-based access** - mỗi role có quyền khác nhau
 
----
+### 🧪 Test Automation
+- **Template instructions** - các test view points có sẵn
+- **Custom instructions** - nhập tài liệu tùy chỉnh
+- **AI-powered test generation** - tự động tạo test cases
 
-## 3. Tổng Quan Hệ Thống
+## 🏗️ Kiến trúc hệ thống
 
-Hệ thống InsightTestAI bao gồm 5 khối chính:
-
-1. **Frontend (React + MUI)**  
-   - Hiển thị giao diện Dashboard, Projects, Project Detail, Agent Run Detail.  
-   - Người dùng thao tác qua các button (tạo project, trigger run, xem log).  
-   - FE chỉ gọi **REST API** từ API Server, không gọi trực tiếp ra ngoài.  
-
-2. **API Server (ExpressJS)**  
-   - Là entrypoint cho FE.  
-   - Xử lý auth (login/logout), CRUD project, CRUD run.  
-   - Lưu & đọc dữ liệu từ **RDS Postgres**.  
-   - Khi có request trigger Agent Run → enqueue message vào **SQS** để Orchestrator xử lý.  
-
-3. **Database (Postgres + pgvector)**  
-   - Lưu trữ users, projects, agent runs, logs.  
-   - Có thể dùng pgvector cho search nội dung (ví dụ tìm test case liên quan).  
-
-4. **Orchestrator Worker (FSM Engine)**  
-   - Chạy background, lắng nghe **SQS**.  
-   - Khi nhận message → bắt đầu một **Agent Run FSM**.  
-   - FSM sẽ điều phối call Bedrock, MCP, ghi log vào DB.  
-   - Trạng thái cập nhật để FE hiển thị theo thời gian thực.  
-
-5. **MCP Server + AWS Bedrock**  
-   - **MCP Server** đóng vai trò “toolbox”, cung cấp các chức năng: `get_diff`, `run_ci`, `notify`.  
-   - **Bedrock LLM** được gọi trong state Planning để sinh test plan/test case.  
-   - MCP có thể mở rộng tích hợp GitHub API, Slack, Docker runner.  
-
-**Sơ đồ tổng quan:**
-
-```Overview
-+-------------------+
-|    Frontend       |
-|  (React + MUI)    |
-+-------------------+
-         |
-         |  HTTP/JSON
-         v
-+-------------------+
-|   Express API     |
-|   (REST API)      |
-+-------------------+
-     |       |
-     |       |-- enqueue 
-     |                 |
-     |                 v
-     |         +-------------------+
-     |         |      AWS SQS      |
-     |         |(agent-runs-queue) |
-     |         +-------------------+
-     |                 ^
-     |                 |
-     |                 |  poll/check
-     |                 |
-     |                 v
-     |         +-------------------+      +-------------------+
-     |         | Orchestrator FSM  |  --> |   Notification    |
-     |         |     Engine        |      |                   |
-     |         +-------------------+      +-------------------+
-     |            |             |
-     |            |             |
-     |         LLM call     invoke MCP
-     |            |             |
-     |            v             v
-     |    +------------+   +-------------------+
-     |    | AWS Bedrock|   | MCP Server - Tools|
-     |    |  (LLM)     |   | - get_diff        |
-     |    +------------+   | - run_ci          |
-     |                     | - notify          |
-     |                     +-------------------+
-     |                        |    |    |
-     |                       REST exec HTTP
-     |                        v    v    v
-     |                    +-------+-------+
-     |                    |GitHub | run_ci|
-     |                    | API   |       |
-     |                    +-------+-------+
-     |                             
-     |                       
-     |                        
-     |                        
-     |                       
-     |
-     |
-     v
-+-----------+
-| Database  |
-| (Postgres |
-|  pgvector)|
-+-----------+
+### Backend (Node.js + Express)
+```
+server/
+├── src/
+│   ├── auth/           # Authentication & authorization
+│   ├── config/         # Configuration & environment
+│   ├── db/            # Database schema & migrations
+│   ├── middleware/    # Express middleware
+│   ├── routes/        # API endpoints
+│   ├── services/      # Business logic
+│   └── utils/         # Utility functions
 ```
 
----
-
-## 4. Chức Năng Frontend (FE)
-
-### 4.1 Dashboard
-- Hiển thị tổng quan theo user login.  
-- Biểu đồ: số lượng Agent Run 24h, 7 ngày, pass/fail.  
-- API gọi:  
-  - `GET /api/stats/summary?range=7d`  
-  - `GET /api/stats/summary?range=24h`  
-
-### 4.2 Projects
-- **Project List**: Hiển thị danh sách project user tạo/tham gia.  
-- **Create Project Wizard**:  
-  1. Nhập `projectName`, `description`  
-  2. Chọn Git Provider (GitHub demo)  
-  3. Chọn Channel notify (Slack/GitHub Issue)  
-- API gọi:  
-  - `GET /api/projects`  
-  - `POST /api/projects`  
-
-### 4.3 Project Detail
-- Hiển thị danh sách Agent Run của Project.  
-- Button `Trigger Run`.  
-- API gọi:  
-  - `GET /api/projects/:id/runs`  
-  - `POST /api/projects/:id/runs`  
-
-### 4.4 Agent Run Detail
-- Hiển thị log/state của FSM.  
-- Polling API để cập nhật trạng thái.  
-- API gọi:  
-  - `GET /api/runs/:id`  
-  - `GET /api/runs/:id/logs`  
-
----
-
-## 5. API List (REST)
-
-- `POST /api/auth/login`  
-- `POST /api/auth/logout`  
-- `GET /api/projects`  
-- `POST /api/projects`  
-- `GET /api/projects/:id`  
-- `PUT /api/projects/:id`  
-- `DELETE /api/projects/:id`  
-- `GET /api/projects/:id/runs`  
-- `POST /api/projects/:id/runs`  
-- `GET /api/runs/:id`  
-- `GET /api/runs/:id/logs`  
-- `GET /api/stats/summary?range=7d` - Thống kê tổng quan với các tham số: 24h, 7d, 30d, 90d
-- `GET /api/stats/projects/:id/summary?range=7d` - Thống kê chi tiết cho project cụ thể
-- `GET /api/stats/trends?days=30` - Dữ liệu xu hướng và moving average
----
-
-## 6. MCP List (Tools)
-
-- `get_diff(repo, commitId)` → gọi GitHub API.  
-- `run_ci(projectId, testPlan)` → chạy test trong Docker.  
-- `notify(channel, message)` → gửi Slack/GitHub Issue.  
-- (Optional) `get_coverage(reportId)`  
-
----
-
-## 7. Database Design (Postgres + pgvector)
-
-- **Users**(id, username, passwordHash, email)  
-- **Projects**(id, ownerId, name, description, provider, repoUrl, notifyChannel)  
-- **Runs**(id, projectId, state, createdAt, finishedAt, logs, metricsJSON)  
-- **RunLogs**(id, runId, timestamp, message, level)  
-
----
-
-## 8. Redis Queue & Dependency Injection
-
-### 8.1 Redis Queue System
-- **Development Mode**: Sử dụng Redis làm queue system
-- **Production Mode**: Có thể chuyển sang AWS SQS
-- **Features**: Hỗ trợ priority (high, normal, low) và delay
-- **Configuration**: 
-  - `QUEUE_TYPE=redis` (default) hoặc `QUEUE_TYPE=sqs`
-  - `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`
-
-### 8.2 LLM Service DI
-- **Development Mode**: Sử dụng Google Gemini AI
-- **Production Mode**: Có thể chuyển sang AWS Bedrock
-- **Configuration**:
-  - `LLM_PROVIDER=gemini` (default) hoặc `LLM_PROVIDER=bedrock`
-  - `GEMINI_API_KEY` cho Gemini
-  - `AWS_REGION`, `BEDROCK_MODEL_ID` cho Bedrock
-
-### 8.3 Code Structure
+### Frontend (React + Material-UI)
 ```
-src/services/
-├── queue/
-│   ├── IQueueService.js          # Interface
-│   ├── RedisQueueService.js      # Redis implementation
-│   ├── SQSQueueService.js        # SQS implementation (placeholder)
-│   └── QueueFactory.js           # Factory pattern
-└── llm/
-    ├── ILLMService.js            # Interface
-    ├── GeminiLLMService.js       # Gemini implementation
-    ├── BedrockLLMService.js      # Bedrock implementation (placeholder)
-    └── LLMFactory.js             # Factory pattern
+client/
+├── src/
+│   ├── components/    # Reusable UI components
+│   ├── contexts/      # React contexts (Auth, Theme)
+│   ├── pages/         # Page components
+│   ├── services/      # API client & utilities
+│   └── theme.js       # Material-UI theme
 ```
 
----
+### Database (PostgreSQL)
+- **users** - thông tin người dùng
+- **projects** - dự án và cấu hình
+- **git_providers** - danh sách Git providers
+- **project_members** - thành viên dự án
+- **runs** - lịch sử chạy test
+- **rag_documents** - tài liệu cho AI
 
-## 9. Demo Flow
+## 🚀 Cài đặt & Chạy
 
-### 9.1 Live Demo Flow (User tạo Project và Trigger Agent Run)
+### Yêu cầu hệ thống
+- Node.js 18+
+- PostgreSQL 14+
+- Docker (tùy chọn)
 
-1. **User login**  
-   - FE gọi `POST /api/auth/login`.  
-   - API xác thực user, trả về token.  
+### Backend
+```bash
+cd server
+npm install
+npm run db:migrate    # Cập nhật database schema
+npm run db:seed       # Thêm dữ liệu mẫu
+npm start             # Chạy server
+```
 
-2. **Tạo Project mới**  
-   - User nhấn **Create Project** → mở wizard.  
-   - FE gọi `POST /api/projects` với thông tin (tên, git provider = GitHub, channel notify = Slack).  
-   - API lưu project vào DB.  
-   - Dashboard cập nhật danh sách project qua `GET /api/projects`.  
+### Frontend
+```bash
+cd client
+npm install
+npm run dev           # Development mode
+npm run build         # Production build
+```
 
-3. **Trigger Agent Run**  
-   - User click **Run** trong Project Detail.  
-   - FE gọi `POST /api/projects/:id/runs`.  
-   - API tạo record run ở DB (state=QUEUED), enqueue message lên SQS.  
+## 📚 API Documentation
 
-4. **Orchestrator Worker xử lý**  
-   - Nhận message từ Redis Queue (dev) hoặc SQS (prod).  
-   - Khởi chạy FSM:  
-     - **Planning**: gọi LLM (Gemini/Bedrock) → sinh test plan.  
-     - **Tooling**: gọi MCP `get_diff` → lấy diff code.  
-     - **Tooling**: gọi MCP `run_ci` → chạy test container.  
-     - **Observing**: lưu log, đọc kết quả test.  
-     - **Adjusting**: nếu fail, retry hoặc fallback.  
-     - **Done/Error**: cập nhật state DB.
+### Authentication
+```
+POST /api/auth/login          # Đăng nhập
+POST /api/auth/register      # Đăng ký
+GET  /api/auth/profile       # Lấy thông tin user
+POST /api/auth/logout        # Đăng xuất
+```
 
-5. **Thông báo**  
-   - Worker gọi MCP `notify` → gửi Slack/GitHub Issue nếu có lỗi.  
+### Projects
+```
+GET    /api/projects                    # Lấy danh sách projects
+POST   /api/projects                    # Tạo project mới
+GET    /api/projects/:id               # Lấy thông tin project
+PUT    /api/projects/:id               # Cập nhật project
+DELETE /api/projects/:id               # Xóa project
+```
 
-6. **FE cập nhật**  
-   - Dashboard và Project Detail gọi `GET /api/runs/:id` và `GET /api/runs/:id/logs`.  
-   - Hiển thị chart 24h, 7d pass/fail.  
+### Git Integration
+```
+GET  /api/git/providers                # Lấy danh sách Git providers
+GET  /api/git/repositories             # Lấy repositories
+POST /api/git/validate-token          # Validate access token
+```
 
----
- 
+### Project Members
+```
+GET    /api/projects/:id/members       # Lấy danh sách members
+POST   /api/projects/:id/members       # Thêm member
+DELETE /api/projects/:id/members/:id   # Xóa member
+```
+
+## 🔧 Cấu hình Git Provider
+
+### Thêm Git Provider mới
+```sql
+INSERT INTO git_providers (name, display_name, domain, is_selfhost) 
+VALUES ('company-gitlab', 'Company GitLab', 'git.company.com', TRUE);
+```
+
+### Cập nhật provider
+```sql
+UPDATE git_providers 
+SET domain = 'new-git.company.com', is_selfhost = TRUE 
+WHERE name = 'company-gitlab';
+```
+
+## 🎯 Workflow sử dụng
+
+1. **Đăng ký/Đăng nhập** vào hệ thống
+2. **Tạo project** với thông tin cơ bản
+3. **Liên kết Git** (tùy chọn):
+   - Chọn Git provider từ danh sách
+   - Nhập Personal Access Token
+   - Nhập domain nếu là self-hosted
+4. **Cấu hình notifications** - chọn kênh thông báo
+5. **Thêm test instructions** - chọn template hoặc nhập tùy chỉnh
+6. **Invite team members** - thêm thành viên với role phù hợp
+7. **Bắt đầu testing** - AI sẽ tự động tạo test cases
+
+## 🤝 Đóng góp
+
+1. Fork repository
+2. Tạo feature branch
+3. Commit changes
+4. Push to branch
+5. Tạo Pull Request
+
+## 📄 License
+
+MIT License - xem file [LICENSE](LICENSE) để biết thêm chi tiết.

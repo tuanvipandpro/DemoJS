@@ -4,52 +4,50 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
   Button,
+  TextField,
+  Typography,
   Box,
   Stepper,
   Step,
   StepLabel,
-  StepContent,
-  Typography,
-  Card,
-  CardContent,
-  Grid,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   Chip,
-  CircularProgress,
   Alert,
-  Divider,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Checkbox,
+  CircularProgress,
   FormControlLabel,
+  Checkbox,
   Radio,
   RadioGroup,
+  FormLabel,
+  Divider,
+  Grid,
+  Card,
+  CardContent,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import {
-  Assignment as ProjectIcon,
   GitHub as GitHubIcon,
   Email as EmailIcon,
   Notifications as NotificationsIcon,
-  CheckCircle as CheckIcon,
-  RadioButtonUnchecked as UncheckedIcon,
-  Refresh as RefreshIcon,
-  CloudDownload as DownloadIcon,
+  Project as ProjectIcon,
   Code as CodeIcon,
-  Storage as GitLabIcon,
-  Storage as BitbucketIcon,
-  Cloud as AzureDevOpsIcon,
+  Download as DownloadIcon,
+  Check as CheckIcon,
+  CalendarToday as CalendarIcon,
+  Description as DescriptionIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { api } from '../services/auth/apiClient.js';
+import { gitService } from '../services/git';
+import { projectsService } from '../services/projects';
+import GitConnectModal from './GitConnectModal';
 
 const steps = [
   {
@@ -147,6 +145,9 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
   });
 
   const [errors, setErrors] = useState({});
+  const [gitConnectModalOpen, setGitConnectModalOpen] = useState(false);
+  const [gitConnected, setGitConnected] = useState(false);
+  const [connectedRepository, setConnectedRepository] = useState(null);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -155,18 +156,7 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
     }
   }, [open]);
 
-  // Debug form data changes
-  useEffect(() => {
-    console.log('Form data changed:', {
-      gitProvider: formData.gitProvider,
-      isConnected: formData.isConnected,
-      showTokenInput: formData.showTokenInput,
-      availableRepos: formData.availableRepos,
-      reposLength: formData.availableRepos?.length,
-      selectedRepository: formData.selectedRepository,
-      branch: formData.branch
-    });
-  }, [formData.gitProvider, formData.isConnected, formData.showTokenInput, formData.availableRepos, formData.selectedRepository, formData.branch]);
+
 
   // Function to save project state
   const saveProjectState = () => {
@@ -192,13 +182,13 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
     };
     
     localStorage.setItem('createProjectState', JSON.stringify(stateToSave));
-    console.log('Modal: Project state saved to localStorage:', stateToSave);
+
   };
 
   // Function to clear saved project state
   const clearSavedProjectState = () => {
     localStorage.removeItem('createProjectState');
-    console.log('Modal: Saved project state cleared');
+
   };
 
   const handleNext = () => {
@@ -302,41 +292,29 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
     try {
       if (formData.gitProvider === 'GitHub') {
         // Gửi token về backend để xác thực và lấy repos
-        const response = await api.post('/git/repos', {
-          token: formData.personalAccessToken
-        });
+        const response = await gitService.connectWithToken(formData.personalAccessToken, formData.gitProvider);
         
-        if (response.status !== 200) {
-          const errorData = response.data;
-          throw new Error(errorData.message || 'Failed to connect with token');
+        if (response.success) {
+          const data = response;
+          
+
+          
+          // Cập nhật form với dữ liệu GitHub
+          setFormData(prev => ({
+            ...prev,
+            isConnecting: false,
+            isConnected: true,
+            availableRepos: data.repositories || [],
+            availableBranches: [],
+            selectedRepository: '',
+            branch: '',
+            showTokenInput: false, // Ẩn input token sau khi connect thành công
+          }));
+          
+
+        } else {
+          throw new Error(response.error || 'Failed to connect with token');
         }
-        
-        const data = response.data;
-        
-        console.log('GitHub API response:', data);
-        console.log('Repositories loaded:', data.repositories);
-        
-        // Cập nhật form với dữ liệu GitHub
-        setFormData(prev => ({
-          ...prev,
-          isConnecting: false,
-          isConnected: true,
-          availableRepos: data.repositories || [],
-          availableBranches: [],
-          selectedRepository: '',
-          branch: '',
-          showTokenInput: false, // Ẩn input token sau khi connect thành công
-        }));
-        
-        console.log(`Modal: GitHub connected with ${data.repositories?.length || 0} repositories`);
-        console.log('Updated form data:', {
-          isConnected: true,
-          availableRepos: data.repositories || [],
-          availableBranches: [],
-          selectedRepository: '',
-          branch: '',
-          showTokenInput: false
-        });
       } else {
         // Các provider khác chưa được hỗ trợ
         throw new Error(`${formData.gitProvider} is not supported yet. Only GitHub is currently supported.`);
@@ -383,27 +361,23 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
       const [owner, repo] = fullName.split('/');
       
       // Gọi API để lấy branches của repository
-      const branchesRes = await api.post(`/git/repos/${owner}/${repo}/branches`, {
-        githubToken: formData.personalAccessToken
-      });
+      const branchesRes = await gitService.getBranches(owner, repo, formData.personalAccessToken);
       
-      if (branchesRes.status !== 200) {
-        const errorData = branchesRes.data;
-        throw new Error(errorData.message || 'Failed to fetch branches');
+      if (branchesRes.success) {
+        const branches = branchesRes.branches || [];
+        const branchNames = (branches || []).map(b => b.name || b);
+        
+        setFormData(prev => ({ 
+          ...prev, 
+          availableBranches: branchNames, 
+          branch: branchNames[0] || '', // Auto-select first branch
+          branchLoading: false 
+        }));
+        
+
+      } else {
+        throw new Error(branchesRes.error || 'Failed to fetch branches');
       }
-      
-      const branches = branchesRes.data.branches || [];
-      const branchNames = (branches || []).map(b => b.name || b);
-      
-      setFormData(prev => ({ 
-        ...prev, 
-        availableBranches: branchNames, 
-        branch: branchNames[0] || '', // Auto-select first branch
-        branchLoading: false 
-      }));
-      
-      console.log(`Loaded ${branchNames.length} branches for repository: ${fullName}`);
-      
     } catch (e) {
       console.error('Fetch branches error:', e);
       setFormData(prev => ({ 
@@ -431,20 +405,63 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (validateCurrentStep()) {
-      const projectData = {
-        ...formData,
-        id: Date.now(),
-        progress: 0,
-        createdAt: new Date().toISOString(),
-        // Include personalAccessToken for secure storage in database
-        personalAccessToken: formData.personalAccessToken || null
-      };
-      onSubmit(projectData);
-      handleReset();
-      onClose();
+      try {
+        // Prepare instruction data - chỉ gửi instruction JSON hoàn chỉnh
+        const instructionData = {
+          customInstructions: null,
+          testingLanguage: null,
+          testingFramework: null,
+          config: {
+            customInstructions: null
+          }
+        };
+
+        const projectData = {
+          name: formData.name.trim(),
+          description: formData.description.trim() || null,
+          gitProvider: formData.gitProvider.toLowerCase(),
+          personalAccessToken: formData.personalAccessToken || null,
+          repository: formData.selectedRepository || null,
+          notifyChannel: formData.selectedNotifications.join(','),
+          members: [], // No additional members for CreateProjectStepperModal
+          instruction: instructionData
+        };
+        
+        const response = await projectsService.createProject(projectData);
+        
+        if (response.success) {
+          onSubmit(response.project);
+          handleReset();
+          onClose();
+        } else {
+          throw new Error(response.error || 'Failed to create project');
+        }
+      } catch (error) {
+        console.error('Error creating project:', error);
+        setErrors({ submit: error.message });
+      }
     }
+  };
+
+  const handleGitConnectSuccess = (projectData) => {
+    // Cập nhật form data với thông tin từ Git
+    setFormData(prev => ({
+      ...prev,
+      isConnected: true,
+      availableRepos: [projectData],
+      selectedRepository: projectData.repository || '',
+      personalAccessToken: projectData.personalAccessToken || '',
+      gitProvider: projectData.gitProvider || 'GitHub'
+    }));
+    setGitConnected(true);
+    setConnectedRepository(projectData);
+    setGitConnectModalOpen(false);
+  };
+
+  const handleConnectGit = () => {
+    setGitConnectModalOpen(true);
   };
 
   // Handle modal open/close and state restoration
@@ -455,7 +472,7 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
       if (savedProjectState) {
         try {
           const restoredState = JSON.parse(savedProjectState);
-          console.log('Modal: Restoring project state on modal open:', restoredState);
+
           
           setFormData(prev => ({
             ...prev,
@@ -474,12 +491,12 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
           // Restore step if it was saved
           if (restoredState.currentStep !== undefined) {
             setActiveStep(restoredState.currentStep);
-            console.log('Modal: Restored to step:', restoredState.currentStep);
+
           }
           
           // Clear saved state after restoration
           localStorage.removeItem('createProjectState');
-          console.log('Modal: Project state restored and localStorage cleared');
+
         } catch (error) {
           console.error('Modal: Failed to restore project state:', error);
           clearSavedProjectState();
@@ -527,331 +544,194 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
   const renderStep2 = () => (
     <Box sx={{ pt: 2 }}>
       <Typography variant="h6" gutterBottom>
-        Git Repository Integration
+        Git Integration
       </Typography>
       
-      {/* Git Provider Selection */}
-      <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
-        Select Git Provider
-      </Typography>
-             <Box sx={{ maxHeight: 300, overflow: 'auto', mb: 3 }}>
-         <List sx={{ p: 0 }}>
-           {gitProviders.map((provider) => (
-             <ListItem
-               key={provider.name}
-               sx={{
-                 border: formData.gitProvider === provider.name ? 2 : 1,
-                 borderColor: formData.gitProvider === provider.name ? 'primary.main' : 'divider',
-                 borderRadius: 1,
-                 mb: 1,
-                 cursor: provider.enabled ? 'pointer' : 'not-allowed',
-                 opacity: provider.enabled ? 1 : 0.5,
-                 '&:hover': provider.enabled ? { 
-                   borderColor: 'primary.main',
-                   bgcolor: 'action.hover'
-                 } : {},
-                 bgcolor: formData.gitProvider === provider.name ? 'action.selected' : 'transparent',
-               }}
-               onClick={() => {
-                 if (provider.enabled) {
-                   setFormData(prev => ({ 
-                     ...prev, 
-                     gitProvider: provider.name,
-                     showTokenInput: false, // Reset token input khi thay đổi provider
-                     personalAccessToken: '', // Reset token
-                     isConnected: false, // Reset connection state
-                     availableRepos: [], // Reset repositories
-                     availableBranches: [], // Reset branches
-                     selectedRepository: '', // Reset selected repo
-                     branch: '', // Reset selected branch
-                   }));
-                   
-                   // Clear errors related to repository and branch
-                   setErrors(prev => {
-                     const newErrors = { ...prev };
-                     delete newErrors.selectedRepository;
-                     delete newErrors.branch;
-                     delete newErrors.personalAccessToken;
-                     return newErrors;
-                   });
-                 }
-               }}
-             >
-               <ListItemIcon sx={{ minWidth: 40 }}>
-                 <Box sx={{ color: provider.enabled ? provider.color : 'grey.400' }}>
-                   {provider.icon}
-                 </Box>
-               </ListItemIcon>
-               <ListItemText
-                 primary={
-                   <Typography 
-                     variant="subtitle2" 
-                     sx={{ 
-                       fontWeight: 'bold',
-                       fontSize: '0.875rem',
-                       lineHeight: 1.2,
-                       color: provider.enabled ? 'text.primary' : 'text.disabled',
-                     }}
-                   >
-                     {provider.name}
-                     {!provider.enabled && (
-                       <Typography 
-                         component="span" 
-                         variant="caption" 
-                         sx={{ 
-                           ml: 1, 
-                           color: 'text.disabled',
-                           fontStyle: 'italic'
-                         }}
-                       >
-                         (Coming Soon)
-                       </Typography>
-                     )}
-                   </Typography>
-                 }
-               />
-             </ListItem>
-           ))}
-         </List>
-       </Box>
-      
-      {errors.gitProvider && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {errors.gitProvider}
-        </Alert>
-      )}
-      
-      {/* Personal Access Token Input */}
-      {formData.gitProvider === 'GitHub' && formData.showTokenInput && (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle1" gutterBottom>
-            Personal Access Token
-          </Typography>
-          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Enter your {formData.gitProvider} Personal Access Token to connect your repositories.
-            <br />
-            <strong>Note:</strong> Your token will be securely stored and used only for repository access.
-          </Typography>
-          <TextField
-            fullWidth
-            label="Personal Access Token"
-            type="password"
-            value={formData.personalAccessToken}
-            onChange={handleChange('personalAccessToken')}
-            error={!!errors.personalAccessToken}
-            helperText={errors.personalAccessToken || 'Enter your Personal Access Token'}
-            placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-            size="medium"
-          />
-        </Box>
-      )}
-      
-      {/* Connect Button - Only show when GitHub provider is selected */}
-      {formData.gitProvider === 'GitHub' && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {/* Git Provider Selection */}
+        <FormControl fullWidth>
+          <InputLabel>Git Provider</InputLabel>
+          <Select
+            value={formData.gitProvider}
+            onChange={handleChange('gitProvider')}
+            label="Git Provider"
+          >
+            <MenuItem value="GitHub">GitHub</MenuItem>
+            <MenuItem value="GitLab">GitLab</MenuItem>
+            <MenuItem value="Bitbucket">Bitbucket</MenuItem>
+          </Select>
+        </FormControl>
+
+        {/* Connect Git Button */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Button
             variant="contained"
-            startIcon={formData.isConnecting ? <CircularProgress size={20} /> : <DownloadIcon />}
-            onClick={handleGitConnect}
-            disabled={formData.isConnecting}
+            startIcon={gitConnected ? <CheckIcon /> : <GitHubIcon />}
+            onClick={handleConnectGit}
+            color={gitConnected ? 'success' : 'primary'}
+            fullWidth
+            size="large"
           >
-            {formData.isConnecting ? 'Connecting...' : 
-             formData.showTokenInput ? 'Connect with Token' : 'Connect Repository'}
+            {gitConnected ? 'Git Connected' : 'Connect Git Repository'}
           </Button>
-          
-          {formData.isConnected && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <CheckIcon color="success" />
-              <Typography variant="body2" color="success.main">
-                Connected successfully
-              </Typography>
-            </Box>
-          )}
         </Box>
-      )}
-      
-      {/* Repository and Branch Selection - Only show after successful connection */}
-      {formData.gitProvider === 'GitHub' && formData.isConnected && (
-        <Box sx={{ mt: 3 }}>
-          {/* Debug info */}
-          <Box sx={{ mb: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1, fontSize: '0.8rem' }}>
-            <Typography variant="caption" color="textSecondary">
-              Debug: Provider={formData.gitProvider}, Connected={formData.isConnected.toString()}, 
-              Repos={formData.availableRepos?.length || 0}
+
+        {/* Show connected repository info if connected */}
+        {gitConnected && connectedRepository && (
+          <Box sx={{ p: 2, bgcolor: 'success.light', borderRadius: 1 }}>
+            <Typography variant="subtitle2" color="success.dark" gutterBottom>
+              ✓ Repository Connected
+            </Typography>
+            <Typography variant="body2" color="success.dark">
+              {connectedRepository.repository}
             </Typography>
           </Box>
-          
-          <Typography variant="subtitle1" gutterBottom>
-            Repository & Branch Selection
-          </Typography>
-          
-          {/* Repository Selection */}
-          <FormControl fullWidth sx={{ mb: 2 }} error={!!errors.selectedRepository}>
-            <InputLabel id="repository-select-label" shrink={true}>Select Repository</InputLabel>
-            <Select
-              labelId="repository-select-label"
-              value={formData.selectedRepository || ''}
-              onChange={handleRepositorySelect}
-              label="Select Repository"
-              displayEmpty
-              notched={true}
-              MenuProps={{
-                PaperProps: {
-                  style: {
-                    maxHeight: 300
-                  }
-                }
-              }}
-            >
-              <MenuItem value="" disabled>
-                <em>Choose a repository...</em>
-              </MenuItem>
-              {formData.availableRepos && formData.availableRepos.length > 0 ? (
-                formData.availableRepos.map((repo) => (
-                  <MenuItem key={repo.id || repo.full_name} value={repo.full_name}>
-                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.5 }}>
-                      <GitHubIcon fontSize="small" sx={{ mt: 0.5 }} />
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
-                          {repo.full_name}
-                        </Typography>
-                        {repo.description && (
-                          <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1 }}>
-                            {repo.description}
-                          </Typography>
-                        )}
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                          {repo.language && (
-                            <Chip 
-                              label={repo.language} 
-                              size="small" 
-                              variant="outlined" 
-                              sx={{ height: 20, fontSize: '0.7rem' }}
-                            />
-                          )}
-                          {repo.private && (
-                            <Chip 
-                              label="Private" 
-                              size="small" 
-                              variant="outlined" 
-                              color="warning"
-                              sx={{ height: 20, fontSize: '0.7rem' }}
-                            />
-                          )}
-                        </Box>
-                      </Box>
-                    </Box>
-                  </MenuItem>
-                ))
-              ) : (
-                <MenuItem disabled>
-                  <Typography variant="body2" color="textSecondary">
-                    No repositories available
-                  </Typography>
-                </MenuItem>
-              )}
-            </Select>
-            {errors.selectedRepository && (
-              <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-                {errors.selectedRepository}
-              </Typography>
-            )}
-            {formData.availableRepos && formData.availableRepos.length === 0 && !errors.selectedRepository && (
-              <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
-                No repositories found. Please check your token permissions.
-              </Typography>
-            )}
-          </FormControl>
-          
-          {/* Branch Selection - Only show after repository is selected */}
-          {formData.selectedRepository && (
-            <FormControl fullWidth error={!!errors.branch}>
-              <InputLabel id="branch-select-label" shrink={true}>Select Branch</InputLabel>
+        )}
+
+        {/* Repository and Branch Selection - Only show after successful connection */}
+        {formData.gitProvider === 'GitHub' && formData.isConnected && (
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Repository & Branch Selection
+            </Typography>
+            
+            {/* Repository Selection */}
+            <FormControl fullWidth sx={{ mb: 2 }} error={!!errors.selectedRepository}>
+              <InputLabel id="repository-select-label" shrink={true}>Select Repository</InputLabel>
               <Select
-                labelId="branch-select-label"
-                value={formData.branch}
-                onChange={handleChange('branch')}
-                label="Select Branch"
-                disabled={formData.branchLoading || (formData.availableBranches || []).length === 0}
+                labelId="repository-select-label"
+                value={formData.selectedRepository || ''}
+                onChange={handleRepositorySelect}
+                label="Select Repository"
                 displayEmpty
                 notched={true}
                 MenuProps={{
                   PaperProps: {
                     style: {
-                      maxHeight: 200
+                      maxHeight: 300
                     }
                   }
                 }}
               >
                 <MenuItem value="" disabled>
-                  <em>Choose a branch...</em>
+                  <em>Choose a repository...</em>
                 </MenuItem>
-                {formData.availableBranches && formData.availableBranches.length > 0 ? (
-                  formData.availableBranches.map((branch) => (
-                    <MenuItem key={branch} value={branch}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}>
-                        <CodeIcon fontSize="small" />
-                        <Typography variant="body2">{branch}</Typography>
+                {formData.availableRepos && formData.availableRepos.length > 0 ? (
+                  formData.availableRepos.map((repo) => (
+                    <MenuItem key={repo.id || repo.full_name} value={repo.full_name}>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.5 }}>
+                        <GitHubIcon fontSize="small" sx={{ mt: 0.5 }} />
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                            {repo.full_name}
+                          </Typography>
+                          {repo.description && (
+                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1 }}>
+                              {repo.description}
+                            </Typography>
+                          )}
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                            {repo.language && (
+                              <Chip 
+                                label={repo.language} 
+                                size="small" 
+                                variant="outlined" 
+                                sx={{ height: 20, fontSize: '0.7rem' }}
+                              />
+                            )}
+                            {repo.private && (
+                              <Chip 
+                                label="Private" 
+                                size="small" 
+                                variant="outlined" 
+                                color="warning"
+                                sx={{ height: 20, fontSize: '0.7rem' }}
+                              />
+                            )}
+                          </Box>
+                        </Box>
                       </Box>
                     </MenuItem>
                   ))
                 ) : (
                   <MenuItem disabled>
                     <Typography variant="body2" color="textSecondary">
-                      No branches available
+                      No repositories available
                     </Typography>
                   </MenuItem>
                 )}
               </Select>
-              {errors.branch && (
+              {errors.selectedRepository && (
                 <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-                  {errors.branch}
+                  {errors.selectedRepository}
                 </Typography>
               )}
-              {formData.branchLoading && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                  <CircularProgress size={18} />
-                  <Typography variant="body2" color="textSecondary">Loading branches...</Typography>
-                </Box>
-              )}
-              {!formData.branchLoading && formData.availableBranches && formData.availableBranches.length === 0 && !errors.branch && (
+              {formData.availableRepos && formData.availableRepos.length === 0 && !errors.selectedRepository && (
                 <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
-                  No branches found for this repository.
+                  No repositories found. Please check your token permissions.
                 </Typography>
               )}
             </FormControl>
-          )}
-          
-          {/* Summary of selected repository and branch */}
-          {formData.selectedRepository && formData.branch && (
-            <Box sx={{ mt: 2, p: 2, bgcolor: 'success.light', borderRadius: 1 }}>
-              <Typography variant="subtitle2" color="success.contrastText" gutterBottom>
-                ✅ Repository Connected Successfully
-              </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                <Typography variant="body2" color="success.contrastText">
-                  <strong>Repository:</strong> {formData.selectedRepository}
-                </Typography>
-                <Typography variant="body2" color="success.contrastText">
-                  <strong>Branch:</strong> {formData.branch}
-                </Typography>
-                <Typography variant="body2" color="success.contrastText">
-                  <strong>Total Branches:</strong> {formData.availableBranches?.length || 0}
-                </Typography>
-              </Box>
-            </Box>
-          )}
-          
-          {/* Debug info for repository and branch */}
-          <Box sx={{ mt: 2, p: 1, bgcolor: 'yellow.100', borderRadius: 1, fontSize: '0.8rem' }}>
-            <Typography variant="caption" color="textSecondary">
-              Debug Repo/Branch: SelectedRepo={formData.selectedRepository || 'none'}, 
-              SelectedBranch={formData.branch || 'none'}, 
-              AvailableBranches={formData.availableBranches?.length || 0}
-            </Typography>
+            
+            {/* Branch Selection - Only show after repository is selected */}
+            {formData.selectedRepository && (
+              <FormControl fullWidth error={!!errors.branch}>
+                <InputLabel id="branch-select-label" shrink={true}>Select Branch</InputLabel>
+                <Select
+                  labelId="branch-select-label"
+                  value={formData.branch}
+                  onChange={handleChange('branch')}
+                  label="Select Branch"
+                  disabled={formData.branchLoading || (formData.availableBranches || []).length === 0}
+                  displayEmpty
+                  notched={true}
+                  MenuProps={{
+                    PaperProps: {
+                      style: {
+                        maxHeight: 200
+                      }
+                    }
+                  }}
+                >
+                  <MenuItem value="" disabled>
+                    <em>Choose a branch...</em>
+                  </MenuItem>
+                  {formData.availableBranches && formData.availableBranches.length > 0 ? (
+                    formData.availableBranches.map((branch) => (
+                      <MenuItem key={branch} value={branch}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}>
+                          <CodeIcon fontSize="small" />
+                          <Typography variant="body2">{branch}</Typography>
+                        </Box>
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>
+                      <Typography variant="body2" color="textSecondary">
+                        Loading branches...
+                      </Typography>
+                    </MenuItem>
+                  )}
+                </Select>
+                {errors.branch && (
+                  <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                    {errors.branch}
+                  </Typography>
+                )}
+              </FormControl>
+            )}
           </Box>
-        </Box>
-      )}
+        )}
+
+        {/* Error Display */}
+        {Object.keys(errors).length > 0 && (
+          <Alert severity="error">
+            {Object.values(errors).map((error, index) => (
+              <div key={index}>{error}</div>
+            ))}
+          </Alert>
+        )}
+      </Box>
     </Box>
   );
 
@@ -984,56 +864,57 @@ const CreateProjectStepperModal = ({ open, onClose, onSubmit }) => {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <ProjectIcon color="primary" />
+        <Box display="flex" alignItems="center" gap={1}>
+          <SettingsIcon color="primary" />
           <Typography variant="h6">Create New Project</Typography>
         </Box>
       </DialogTitle>
       
       <DialogContent>
-        <Stepper activeStep={activeStep} orientation="vertical" sx={{ mb: 3 }}>
-          {steps.map((step, index) => (
-            <Step key={step.label}>
-              <StepLabel
-                StepIconComponent={() => (
-                  <Box sx={{ color: activeStep >= index ? 'primary.main' : 'grey.400' }}>
-                    {step.icon}
-                  </Box>
-                )}
-              >
-                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                  {step.label}
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  {step.description}
-                </Typography>
-              </StepLabel>
-              <StepContent>
-                <Box sx={{ mb: 2 }}>
-                  {getStepContent(index)}
-                </Box>
-              </StepContent>
+        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+          {steps.map((label, index) => (
+            <Step key={label}>
+              <StepLabel>{label}</StepLabel>
             </Step>
           ))}
         </Stepper>
+        
+        {activeStep === 0 && renderStep1()}
+        {activeStep === 1 && renderStep2()}
+        {activeStep === 2 && renderStep3()}
+        {activeStep === 3 && renderStep4()}
       </DialogContent>
       
-      <DialogActions sx={{ p: 3 }}>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button
-          disabled={activeStep === 0}
-          onClick={handleBack}
-          sx={{ mr: 1 }}
-        >
+      <DialogActions>
+        <Button onClick={handleBack} disabled={activeStep === 0}>
           Back
         </Button>
-        <Button
-          variant="contained"
-          onClick={activeStep === steps.length - 1 ? handleSubmit : handleNext}
-        >
-          {activeStep === steps.length - 1 ? 'Create Project' : 'Next'}
+        <Box sx={{ flex: '1 1 auto' }} />
+        <Button onClick={handleClose}>
+          Cancel
         </Button>
+        {activeStep === steps.length - 1 ? (
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            disabled={!canProceed()}
+            startIcon={loading ? <CircularProgress size={20} /> : null}
+          >
+            {loading ? 'Creating...' : 'Create Project'}
+          </Button>
+        ) : (
+          <Button onClick={handleNext} variant="contained" disabled={!canProceed()}>
+            Next
+          </Button>
+        )}
       </DialogActions>
+      
+      {/* GitHub Connect Modal */}
+              <GitConnectModal
+        open={gitConnectModalOpen}
+        onClose={() => setGitConnectModalOpen(false)}
+        onSuccess={handleGitConnectSuccess}
+      />
     </Dialog>
   );
 };

@@ -1,0 +1,220 @@
+{
+  "language": "Java",
+  "testing_framework": "JUnit 5",
+  "scope": "Unit Testing",
+  "description": "Mẫu instruction test view point cho Java Unit Testing sử dụng JUnit 5 framework",
+  "templates": [
+    {
+      "id": "java-ut-method-testing",
+      "name": "Method Testing",
+      "description": "Test các method đơn lẻ với các input/output khác nhau",
+      "viewpoints": [
+        "Parameter validation testing",
+        "Return value testing",
+        "Exception handling testing",
+        "Edge case testing",
+        "Boundary value testing"
+      ],
+      "test_patterns": [
+        "Arrange-Act-Assert (AAA)",
+        "Given-When-Then",
+        "Setup-Execute-Verify"
+      ],
+      "examples": [
+        "Test method với null parameters",
+        "Test method với empty collections",
+        "Test method với negative values",
+        "Test method với maximum/minimum values",
+        "Test method với invalid input types"
+      ],
+      "coverage_focus": [
+        "Line coverage",
+        "Branch coverage",
+        "Method coverage"
+      ]
+    },
+    {
+      "id": "java-ut-class-testing",
+      "name": "Class Testing",
+      "description": "Test các class và instance methods",
+      "viewpoints": [
+        "Constructor testing",
+        "Instance method testing",
+        "Static method testing",
+        "Field testing",
+        "Access modifier testing"
+      ],
+      "test_patterns": [
+        "Object instantiation testing",
+        "Method invocation testing",
+        "State verification testing",
+        "Dependency injection testing"
+      ],
+      "examples": [
+        "Test constructor với valid parameters",
+        "Test constructor với invalid parameters",
+        "Test public methods",
+        "Test package-private methods",
+        "Test method chaining",
+        "Test method với different object states"
+      ],
+      "coverage_focus": [
+        "Constructor coverage",
+        "Method coverage",
+        "Field access coverage"
+      ]
+    },
+    {
+      "id": "java-ut-interface-testing",
+      "name": "Interface Testing",
+      "description": "Test các interface implementations",
+      "viewpoints": [
+        "Contract compliance testing",
+        "Default method testing",
+        "Functional interface testing",
+        "Interface inheritance testing"
+      ],
+      "test_patterns": [
+        "Implementation verification testing",
+        "Default method behavior testing",
+        "Lambda expression testing"
+      ],
+      "examples": [
+        "Test interface method implementations",
+        "Test default method behavior",
+        "Test functional interface với lambda",
+        "Test interface inheritance chain"
+      ],
+      "coverage_focus": [
+        "Interface method coverage",
+        "Default method coverage",
+        "Implementation coverage"
+      ]
+    },
+    {
+      "id": "java-ut-collection-testing",
+      "name": "Collection Testing",
+      "description": "Test các collection operations và algorithms",
+      "viewpoints": [
+        "Collection creation testing",
+        "Element manipulation testing",
+        "Iteration testing",
+        "Sorting testing",
+        "Filtering testing"
+      ],
+      "test_patterns": [
+        "Empty collection testing",
+        "Single element testing",
+        "Multiple elements testing",
+        "Large collection testing"
+      ],
+      "examples": [
+        "Test collection với empty elements",
+        "Test collection với single element",
+        "Test collection với multiple elements",
+        "Test collection operations",
+        "Test collection iteration",
+        "Test collection sorting"
+      ],
+      "coverage_focus": [
+        "Collection operation coverage",
+        "Element handling coverage",
+        "Algorithm coverage"
+      ]
+    },
+    {
+      "id": "java-ut-exception-testing",
+      "name": "Exception Testing",
+      "description": "Test các exception handling và error scenarios",
+      "viewpoints": [
+        "Checked exception testing",
+        "Unchecked exception testing",
+        "Custom exception testing",
+        "Exception message testing",
+        "Exception chaining testing"
+      ],
+      "test_patterns": [
+        "Exception throwing testing",
+        "Exception catching testing",
+        "Exception propagation testing"
+      ],
+      "examples": [
+        "Test method throws expected exception",
+        "Test exception message content",
+        "Test exception cause",
+        "Test exception stack trace",
+        "Test custom exception behavior"
+      ],
+      "coverage_focus": [
+        "Exception path coverage",
+        "Error handling coverage",
+        "Recovery path coverage"
+      ]
+    },
+    {
+      "id": "java-ut-utility-testing",
+      "name": "Utility Testing",
+      "description": "Test các utility classes và static methods",
+      "viewpoints": [
+        "Static method testing",
+        "Utility class testing",
+        "Helper method testing",
+        "Validation testing",
+        "Formatting testing"
+      ],
+      "test_patterns": [
+        "Pure function testing",
+        "Side effect testing",
+        "Performance testing",
+        "Memory usage testing"
+      ],
+      "examples": [
+        "Test static utility methods",
+        "Test validation logic",
+        "Test formatting functions",
+        "Test calculation functions",
+        "Test helper utilities"
+      ],
+      "coverage_focus": [
+        "Static method coverage",
+        "Utility logic coverage",
+        "Helper function coverage"
+      ]
+    }
+  ],
+  "common_testing_principles": [
+    "Test isolation - mỗi test method phải độc lập",
+    "Clear naming - tên test method phải mô tả rõ ràng test case",
+    "Single responsibility - mỗi test chỉ test một behavior",
+    "Fast execution - test phải chạy nhanh",
+    "Reliable - test phải ổn định và không flaky"
+  ],
+  "best_practices": [
+    "Sử dụng @Test annotation cho test methods",
+    "Sử dụng @BeforeEach/@AfterEach cho setup/cleanup",
+    "Sử dụng @BeforeAll/@AfterAll cho class-level setup/cleanup",
+    "Mock external dependencies với Mockito",
+    "Test both positive và negative cases",
+    "Sử dụng meaningful test data",
+    "Avoid test interdependence"
+  ],
+  "testing_tools": [
+    "JUnit 5 - testing framework",
+    "Mockito - mocking framework",
+    "AssertJ - fluent assertions",
+    "Hamcrest - matcher library",
+    "JaCoCo - code coverage",
+    "Test containers - integration testing"
+  ],
+  "junit5_annotations": [
+    "@Test - marks method as test",
+    "@BeforeEach - runs before each test",
+    "@AfterEach - runs after each test",
+    "@BeforeAll - runs once before all tests",
+    "@AfterAll - runs once after all tests",
+    "@DisplayName - custom test name",
+    "@Tag - categorize tests",
+    "@ParameterizedTest - parameterized tests",
+    "@RepeatedTest - repeat test multiple times"
+  ]
+}

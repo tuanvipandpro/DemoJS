@@ -22,12 +22,7 @@ const axiosInstance = axios.create({
   timeout: 30000, // 30 seconds timeout
 });
 
-// Log API configuration for debugging
-console.log('API Client initialized with:', {
-  baseURL: API_BASE,
-  isProxy: API_BASE === '/api',
-  isDirect: API_BASE.startsWith('http')
-});
+
 
 // Interceptor để thêm token vào header
 axiosInstance.interceptors.request.use(
@@ -38,13 +33,7 @@ axiosInstance.interceptors.request.use(
     }
     
     // Log request for debugging
-    console.log('API Request:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      baseURL: config.baseURL,
-      fullURL: `${config.baseURL}${config.url}`,
-      hasToken: !!token
-    });
+
     
     return config;
   },
@@ -57,12 +46,7 @@ axiosInstance.interceptors.request.use(
 // Interceptor để xử lý response và refresh token
 axiosInstance.interceptors.response.use(
   (response) => {
-    // Log successful response for debugging
-    console.log('API Response:', {
-      status: response.status,
-      url: response.config.url,
-      method: response.config.method?.toUpperCase()
-    });
+
     return response;
   },
   async (error) => {
@@ -72,7 +56,7 @@ axiosInstance.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/token/refresh')) {
       originalRequest._retry = true;
 
-      console.log('Token expired, attempting to refresh...');
+
 
       try {
         const refresh = getRefreshToken();
@@ -83,18 +67,18 @@ axiosInstance.interceptors.response.use(
           return Promise.reject(error);
         }
 
-        console.log('Calling refresh token endpoint...');
+
         // Sử dụng axios gốc thay vì axiosInstance để tránh vòng lặp
         const refreshResponse = await axios.post(`${API_BASE}/auth/token/refresh`, {
           refresh_token: refresh
         });
 
         if (refreshResponse.data.access_token) {
-          console.log('Token refreshed successfully');
+
           setAccessToken(refreshResponse.data.access_token);
           // Thử lại request gốc với token mới
           originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.access_token}`;
-          console.log('Retrying original request with new token');
+
           return axiosInstance(originalRequest);
         } else {
           console.log('Refresh response missing access_token');

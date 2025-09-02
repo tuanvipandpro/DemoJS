@@ -1,27 +1,42 @@
 {
   "name": "insighttestai-server",
   "version": "0.1.0",
-  "private": true,
+  "description": "InsightTestAI Backend Server",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon --watch src src/index.js"
+    "dev": "nodemon src/index.js",
+    "migrate": "node run-migration.js"
   },
   "dependencies": {
-    "axios": "^1.6.0",
-    "bcryptjs": "^2.4.3",
-    "chalk": "^5.3.0",
+    "express": "^4.18.2",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
     "helmet": "^7.1.0",
-    "ioredis": "^5.3.2",
+    "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.12.0",
-    "swagger-ui-express": "^5.0.1"
+    "pg": "^8.11.3",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0",
+    "axios": "^1.6.2",
+    "multer": "^1.4.5-lts.1",
+    "swagger-ui-express": "^5.0.0",
+    "swagger-jsdoc": "^6.2.8"
   },
   "devDependencies": {
-    "nodemon": "^3.1.4"
-  }
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "ai",
+    "testing",
+    "automation",
+    "rag",
+    "vector-search"
+  ],
+  "author": "InsightTestAI Team",
+  "license": "MIT"
 }

@@ -1,0 +1,284 @@
+{
+  "language": "Python",
+  "testing_framework": "pytest",
+  "scope": "Unit Testing",
+  "description": "Mẫu instruction test view point cho Python Unit Testing sử dụng pytest framework",
+  "templates": [
+    {
+      "id": "python-ut-function-testing",
+      "name": "Function Testing",
+      "description": "Test các function đơn lẻ với các input/output khác nhau",
+      "viewpoints": [
+        "Parameter validation testing",
+        "Return value testing",
+        "Exception handling testing",
+        "Edge case testing",
+        "Boundary value testing"
+      ],
+      "test_patterns": [
+        "Arrange-Act-Assert (AAA)",
+        "Given-When-Then",
+        "Setup-Execute-Verify"
+      ],
+      "examples": [
+        "Test function với None input",
+        "Test function với empty strings/lists",
+        "Test function với negative numbers",
+        "Test function với very large numbers",
+        "Test function với special characters",
+        "Test function với different data types"
+      ],
+      "coverage_focus": [
+        "Statement coverage",
+        "Branch coverage",
+        "Function coverage"
+      ]
+    },
+    {
+      "id": "python-ut-class-testing",
+      "name": "Class Testing",
+      "description": "Test các class và methods của chúng",
+      "viewpoints": [
+        "Constructor testing",
+        "Instance method testing",
+        "Class method testing",
+        "Static method testing",
+        "Property testing",
+        "Inheritance testing"
+      ],
+      "test_patterns": [
+        "Object instantiation testing",
+        "Method call testing",
+        "State verification testing",
+        "Dependency injection testing"
+      ],
+      "examples": [
+        "Test __init__ method với valid parameters",
+        "Test __init__ method với invalid parameters",
+        "Test instance methods",
+        "Test class methods",
+        "Test static methods",
+        "Test properties",
+        "Test method chaining",
+        "Test method với different object states"
+      ],
+      "coverage_focus": [
+        "Constructor coverage",
+        "Method coverage",
+        "Property coverage"
+      ]
+    },
+    {
+      "id": "python-ut-module-testing",
+      "name": "Module Testing",
+      "description": "Test các module và package functionality",
+      "viewpoints": [
+        "Import testing",
+        "Module-level function testing",
+        "Package initialization testing",
+        "Namespace testing"
+      ],
+      "test_patterns": [
+        "Module import testing",
+        "Module function testing",
+        "Package structure testing"
+      ],
+      "examples": [
+        "Test module imports correctly",
+        "Test module-level functions",
+        "Test package __init__.py",
+        "Test module namespace",
+        "Test module constants"
+      ],
+      "coverage_focus": [
+        "Module import coverage",
+        "Module function coverage",
+        "Package structure coverage"
+      ]
+    },
+    {
+      "id": "python-ut-generator-testing",
+      "name": "Generator Testing",
+      "description": "Test các generator functions và iterators",
+      "viewpoints": [
+        "Generator function testing",
+        "Iterator protocol testing",
+        "Yield statement testing",
+        "Generator expression testing"
+      ],
+      "test_patterns": [
+        "Generator creation testing",
+        "Iterator iteration testing",
+        "Generator state testing"
+      ],
+      "examples": [
+        "Test generator function creation",
+        "Test generator iteration",
+        "Test generator với different inputs",
+        "Test generator exhaustion",
+        "Test generator expressions"
+      ],
+      "coverage_focus": [
+        "Generator creation coverage",
+        "Iterator protocol coverage",
+        "Yield statement coverage"
+      ]
+    },
+    {
+      "id": "python-ut-decorator-testing",
+      "name": "Decorator Testing",
+      "description": "Test các decorators và their effects",
+      "viewpoints": [
+        "Function decorator testing",
+        "Class decorator testing",
+        "Decorator chaining testing",
+        "Decorator parameter testing"
+      ],
+      "test_patterns": [
+        "Decorated function testing",
+        "Decorator behavior testing",
+        "Decorator composition testing"
+      ],
+      "examples": [
+        "Test function decorator",
+        "Test class decorator",
+        "Test decorator với parameters",
+        "Test decorator chaining",
+        "Test decorator side effects"
+      ],
+      "coverage_focus": [
+        "Decorator application coverage",
+        "Decorated function coverage",
+        "Decorator behavior coverage"
+      ]
+    },
+    {
+      "id": "python-ut-context-manager-testing",
+      "name": "Context Manager Testing",
+      "description": "Test các context managers và with statements",
+      "viewpoints": [
+        "Context manager protocol testing",
+        "Enter/exit testing",
+        "Exception handling testing",
+        "Resource management testing"
+      ],
+      "test_patterns": [
+        "Context manager creation testing",
+        "With statement testing",
+        "Exception propagation testing"
+      ],
+      "examples": [
+        "Test __enter__ method",
+        "Test __exit__ method",
+        "Test with statement execution",
+        "Test exception handling trong context",
+        "Test resource cleanup"
+      ],
+      "coverage_focus": [
+        "Context manager protocol coverage",
+        "Enter/exit method coverage",
+        "Exception handling coverage"
+      ]
+    },
+    {
+      "id": "python-ut-exception-testing",
+      "name": "Exception Testing",
+      "description": "Test các exception handling và error scenarios",
+      "viewpoints": [
+        "Built-in exception testing",
+        "Custom exception testing",
+        "Exception message testing",
+        "Exception chaining testing",
+        "Exception suppression testing"
+      ],
+      "test_patterns": [
+        "Exception raising testing",
+        "Exception catching testing",
+        "Exception propagation testing"
+      ],
+      "examples": [
+        "Test function raises expected exception",
+        "Test exception message content",
+        "Test exception type",
+        "Test exception chaining",
+        "Test custom exception behavior"
+      ],
+      "coverage_focus": [
+        "Exception path coverage",
+        "Error handling coverage",
+        "Recovery path coverage"
+      ]
+    },
+    {
+      "id": "python-ut-utility-testing",
+      "name": "Utility Testing",
+      "description": "Test các utility functions và helpers",
+      "viewpoints": [
+        "Built-in function testing",
+        "Utility function testing",
+        "Helper function testing",
+        "Validation testing",
+        "Formatting testing"
+      ],
+      "test_patterns": [
+        "Pure function testing",
+        "Side effect testing",
+        "Performance testing",
+        "Memory usage testing"
+      ],
+      "examples": [
+        "Test built-in functions",
+        "Test utility functions",
+        "Test validation logic",
+        "Test formatting functions",
+        "Test calculation functions",
+        "Test helper utilities"
+      ],
+      "coverage_focus": [
+        "Utility function coverage",
+        "Helper logic coverage",
+        "Built-in function coverage"
+      ]
+    }
+  ],
+  "common_testing_principles": [
+    "Test isolation - mỗi test function phải độc lập",
+    "Clear naming - tên test function phải mô tả rõ ràng test case",
+    "Single responsibility - mỗi test chỉ test một behavior",
+    "Fast execution - test phải chạy nhanh",
+    "Reliable - test phải ổn định và không flaky"
+  ],
+  "best_practices": [
+    "Sử dụng test_ prefix cho test functions",
+    "Sử dụng pytest fixtures cho setup/cleanup",
+    "Sử dụng parametrize cho multiple test cases",
+    "Mock external dependencies với unittest.mock",
+    "Test both positive và negative cases",
+    "Sử dụng meaningful test data",
+    "Avoid test interdependence"
+  ],
+  "testing_tools": [
+    "pytest - testing framework",
+    "pytest-mock - mocking utilities",
+    "pytest-cov - code coverage",
+    "pytest-html - HTML reports",
+    "pytest-xdist - parallel testing",
+    "unittest.mock - mocking library"
+  ],
+  "pytest_features": [
+    "Fixtures - setup/cleanup utilities",
+    "Parametrize - multiple test cases",
+    "Markers - categorize tests",
+    "Hooks - customize test behavior",
+    "Plugins - extend functionality",
+    "Configuration - customize settings"
+  ],
+  "python_specific_testing": [
+    "Type hint testing",
+    "Docstring testing",
+    "Import testing",
+    "Package testing",
+    "Virtual environment testing",
+    "Dependency testing"
+  ]
+}

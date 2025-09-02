@@ -52,6 +52,14 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, [showError, checkAuth]);
 
+  // Update token when authentication state changes
+  useEffect(() => {
+    const token = getAccessToken();
+    if (token && !isAuthenticated) {
+      checkAuth();
+    }
+  }, [isAuthenticated, checkAuth]);
+
   const login = async (username, password) => {
     try {
       setLoading(true);
@@ -114,6 +122,7 @@ export const AuthProvider = ({ children }) => {
     loginWithGoogle,
     register,
     logout,
+    token: getAccessToken(), // Add token to context
   };
 
   return (

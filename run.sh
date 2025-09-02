@@ -1,49 +1,142 @@
 #!/bin/bash
 
-# Traps a signal to kill all background jobs upon script termination.
-# This ensures a clean shutdown of all started processes.
-trap 'kill $(jobs -p)' EXIT
+# InsightTestAI Development Startup Script
+# Script này sẽ start database bằng Docker và chạy server + client ở development mode
 
-echo "Starting Docker Compose for Postgres Vector DB..."
-docker-compose up -d
+set -e
 
-echo "Waiting for Docker containers to be healthy..."
+echo "🚀 Starting InsightTestAI in Development Mode..."
 
-# Loop until a container with 'postgres' in its name is running and healthy.
-# The 'docker ps' command is reliable on any system with Docker installed.
-while ! docker ps --filter "name=postgres" --format '{{.Status}}' | grep -q 'healthy'; do
-  sleep 1 # Wait for 1 second before checking again
+# Kiểm tra Docker có sẵn không
+if ! command -v docker &> /dev/null; then
+    echo "❌ Docker is not installed or not in PATH"
+    echo "Please install Docker and try again"
+    exit 1
+fi
+
+if ! command -v docker-compose &> /dev/null; then
+    echo "❌ Docker Compose is not installed or not in PATH"
+    echo "Please install Docker Compose and try again"
+    exit 1
+fi
+
+# Kiểm tra Node.js có sẵn không
+if ! command -v node &> /dev/null; then
+    echo "❌ Node.js is not installed or not in PATH"
+    echo "Please install Node.js 18+ and try again"
+    exit 1
+fi
+
+# Kiểm tra npm có sẵn không
+if ! command -v npm &> /dev/null; then
+    echo "❌ npm is not installed or not in PATH"
+    echo "Please install npm and try again"
+    exit 1
+fi
+
+echo "✅ Prerequisites check passed"
+
+# Function để cleanup khi script bị interrupt
+cleanup() {
+    echo ""
+    echo "🛑 Shutting down development environment..."
+    
+    # Dừng server và client nếu đang chạy
+    if [ ! -z "$SERVER_PID" ]; then
+        echo "Stopping server (PID: $SERVER_PID)..."
+        kill $SERVER_PID 2>/dev/null || true
+    fi
+    
+    if [ ! -z "$CLIENT_PID" ]; then
+        echo "Stopping client (PID: $CLIENT_PID)..."
+        kill $CLIENT_PID 2>/dev/null || true
+    fi
+    
+    # Dừng database
+    echo "Stopping database..."
+    docker-compose -f docker-compose-dev.yml down
+    
+    echo "✅ Development environment stopped"
+    exit 0
+}
+
+# Trap interrupt signals
+trap cleanup SIGINT SIGTERM
+
+# Start database
+echo "🗄️ Starting PostgreSQL database..."
+docker-compose -f docker-compose-dev.yml up -d
+
+# Đợi database sẵn sàng
+echo "⏳ Waiting for database to be ready..."
+until docker-compose -f docker-compose-dev.yml exec -T postgres pg_isready -U postgres -d insighttestai; do
+    echo "Database is not ready yet, waiting..."
+    sleep 1
 done
 
-echo "Docker containers are ready. Installing dependencies..."
+echo "✅ Database is ready!"
 
-# Install backend dependencies
-echo "Installing backend dependencies..."
+# Kiểm tra và cài đặt dependencies cho server
+echo "📦 Installing server dependencies..."
 cd server
-npm install
+if [ ! -d "node_modules" ]; then
+    echo "Installing server dependencies..."
+    npm install
+else
+    echo "Server dependencies already installed"
+fi
 
-# Install frontend dependencies
-echo "Installing frontend dependencies..."
+# Kiểm tra và cài đặt dependencies cho client
+echo "📦 Installing client dependencies..."
 cd ../client
-npm install
+if [ ! -d "node_modules" ]; then
+    echo "Installing client dependencies..."
+    npm install
+else
+    echo "Client dependencies already installed"
+fi
 
-echo "Dependencies installed. Starting backend and frontend..."
+cd ..
 
-# Start backend in the background and capture its Process ID (PID)
-cd ../server
+# Start server ở development mode
+echo "🚀 Starting server in development mode..."
+cd server
 npm run dev &
-BACKEND_PID=$!
+SERVER_PID=$!
+cd ..
 
-# Start frontend in the background and capture its PID
-cd ../client
+# Đợi server khởi động
+echo "⏳ Waiting for server to start..."
+sleep 5
+
+# Kiểm tra server có chạy không
+if ! curl -s http://localhost:3001/api/health > /dev/null; then
+    echo "❌ Server failed to start"
+    cleanup
+fi
+
+echo "✅ Server is running on http://localhost:3001"
+
+# Start client ở development mode
+echo "🎨 Starting client in development mode..."
+cd client
 npm run dev &
-FRONTEND_PID=$!
+CLIENT_PID=$!
+cd ..
 
-echo "Backend (PID: $BACKEND_PID) and frontend (PID: $FRONTEND_PID) are running."
-echo "Press Ctrl+C to stop both processes gracefully."
+# Đợi client khởi động
+echo "⏳ Waiting for client to start..."
+sleep 5
 
-# Wait for the background processes to finish.
-wait $BACKEND_PID
-wait $FRONTEND_PID
+echo "✅ Client is starting on http://localhost:5173"
+echo ""
+echo "🎯 Development environment is ready!"
+echo "📊 Server: http://localhost:3001"
+echo "🎨 Client: http://localhost:5173"
+echo "🗄️ Database: localhost:5432"
+echo "📚 API Docs: http://localhost:3001/api/docs"
+echo ""
+echo "Press Ctrl+C to stop all services"
 
-echo "All processes have been stopped."
+# Đợi user interrupt
+wait

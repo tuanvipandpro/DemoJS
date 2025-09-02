@@ -1,5 +1,4 @@
-import chalk from 'chalk';
-
+// Simple logger without external dependencies
 const LEVELS = {
   debug: 10,
   info: 20,
@@ -26,15 +25,15 @@ function timestamp() {
 function levelBadge(level) {
   switch (level) {
     case 'debug':
-      return chalk.bgMagenta.black.bold(' DEBUG ');
+      return ' [DEBUG] ';
     case 'info':
-      return chalk.bgCyan.black.bold(' INFO ');
+      return ' [INFO] ';
     case 'warn':
-      return chalk.bgYellow.black.bold(' WARN ');
+      return ' [WARN] ';
     case 'error':
-      return chalk.bgRed.black.bold(' ERROR ');
+      return ' [ERROR] ';
     default:
-      return chalk.bgWhite.black(` ${level.toUpperCase()} `);
+      return ` [${level.toUpperCase()}] `;
   }
 }
 
@@ -46,7 +45,7 @@ function chooseConsole(level) {
 
 function log(level, ...args) {
   if (!isEnabled(level)) return;
-  const ts = chalk.gray(`[${timestamp()}]`);
+  const ts = `[${timestamp()}]`;
   const badge = levelBadge(level);
   const writer = chooseConsole(level);
   writer(badge, ts, ...args);

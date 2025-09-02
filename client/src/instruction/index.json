@@ -1,0 +1,101 @@
+{
+  "name": "Test Instruction Templates",
+  "description": "Bộ sưu tập các mẫu instruction test view point cho AI generate test case và test script",
+  "version": "1.0.0",
+  "scope": "Unit Testing",
+  "languages": [
+    {
+      "language": "JavaScript",
+      "framework": "Jest",
+      "file": "javascript-ut-templates.json",
+      "description": "Mẫu instruction cho JavaScript Unit Testing với Jest framework",
+      "key_features": [
+        "Function testing",
+        "Class testing", 
+        "Async testing",
+        "DOM testing",
+        "Utility testing"
+      ]
+    },
+    {
+      "language": "Java",
+      "framework": "JUnit 5",
+      "file": "java-ut-templates.json",
+      "description": "Mẫu instruction cho Java Unit Testing với JUnit 5 framework",
+      "key_features": [
+        "Method testing",
+        "Class testing",
+        "Interface testing",
+        "Collection testing",
+        "Exception testing",
+        "Utility testing"
+      ]
+    },
+    {
+      "language": "Python",
+      "framework": "pytest",
+      "file": "python-ut-templates.json",
+      "description": "Mẫu instruction cho Python Unit Testing với pytest framework",
+      "key_features": [
+        "Function testing",
+        "Class testing",
+        "Module testing",
+        "Generator testing",
+        "Decorator testing",
+        "Context manager testing",
+        "Exception testing",
+        "Utility testing"
+      ]
+    }
+  ],
+  "common_testing_concepts": [
+    {
+      "concept": "Test Viewpoints",
+      "description": "Các góc nhìn khác nhau khi thiết kế test cases",
+      "examples": [
+        "Input validation",
+        "Output validation",
+        "Edge cases",
+        "Error handling",
+        "Boundary values",
+        "State verification"
+      ]
+    },
+    {
+      "concept": "Test Patterns",
+      "description": "Các mẫu thiết kế test phổ biến",
+      "examples": [
+        "Arrange-Act-Assert (AAA)",
+        "Given-When-Then",
+        "Setup-Execute-Verify",
+        "Object instantiation testing",
+        "Method invocation testing"
+      ]
+    },
+    {
+      "concept": "Coverage Focus",
+      "description": "Các loại coverage cần đạt được",
+      "examples": [
+        "Statement coverage",
+        "Branch coverage",
+        "Function coverage",
+        "Line coverage",
+        "Method coverage"
+      ]
+    }
+  ],
+  "ai_generation_guidelines": [
+    "Sử dụng các viewpoint để đảm bảo test cases bao phủ đầy đủ các khía cạnh",
+    "Áp dụng test patterns để tạo ra test cases có cấu trúc rõ ràng",
+    "Tập trung vào coverage focus để đảm bảo chất lượng test",
+    "Tuân thủ các testing principles và best practices",
+    "Tạo test cases có thể chạy độc lập và ổn định"
+  ],
+  "usage_instructions": [
+    "Chọn template phù hợp với ngôn ngữ lập trình",
+    "Tham khảo các viewpoint để thiết kế test cases",
+    "Sử dụng test patterns để cấu trúc test code",
+    "Đảm bảo đạt được coverage focus mong muốn",
+    "Tuân thủ best practices của từng framework"
+  ]
+}

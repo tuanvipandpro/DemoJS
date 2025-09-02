@@ -35,7 +35,8 @@ import {
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import Logo from '../components/Logo';
-import CreateProjectStepperModal from '../components/CreateProjectStepperModal';
+import CreateProjectModal from '../components/CreateProjectModal';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { statsService } from '../services/index.js';
 import {
   ResponsiveContainer,
@@ -134,6 +135,8 @@ const Dashboard = () => {
 
   const [openConnectModal, setOpenConnectModal] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [confirmScanOpen, setConfirmScanOpen] = useState(false);
+  const [scanningChanges, setScanningChanges] = useState(false);
 
   // Fetch stats data
   const fetchStats = async (range = timeRange) => {
@@ -187,8 +190,22 @@ const Dashboard = () => {
   const recentActivity = statsData?.recent_activity || [];
 
   const handleScanChanges = () => {
-    // Simulate scan
-    setSnackbar({ open: true, message: 'Đã quét thay đổi và kích hoạt AI tests', severity: 'success' });
+    setConfirmScanOpen(true);
+  };
+
+  const handleConfirmScan = async () => {
+    try {
+      setScanningChanges(true);
+      // Simulate scan
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setSnackbar({ open: true, message: 'Đã quét thay đổi và kích hoạt AI tests', severity: 'success' });
+      setConfirmScanOpen(false);
+    } catch (error) {
+      console.error('Error scanning changes:', error);
+      setSnackbar({ open: true, message: 'Có lỗi xảy ra khi quét thay đổi', severity: 'error' });
+    } finally {
+      setScanningChanges(false);
+    }
   };
 
   const handleCloseSnackbar = () => setSnackbar((s) => ({ ...s, open: false }));
@@ -490,7 +507,7 @@ const Dashboard = () => {
       )}
 
       {/* Modals & Snackbar */}
-      <CreateProjectStepperModal
+      <CreateProjectModal
         open={openConnectModal}
         onClose={() => setOpenConnectModal(false)}
         onSubmit={() => {
@@ -510,6 +527,19 @@ const Dashboard = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Confirm Scan Changes Dialog */}
+      <ConfirmDialog
+        open={confirmScanOpen}
+        onClose={() => setConfirmScanOpen(false)}
+        onConfirm={handleConfirmScan}
+        title="Xác nhận quét thay đổi"
+        message="Bạn có chắc chắn muốn quét thay đổi và chạy AI tests? Hành động này sẽ kiểm tra repository và kích hoạt quá trình test automation."
+        confirmText="Quét thay đổi"
+        cancelText="Hủy"
+        severity="info"
+        loading={scanningChanges}
+      />
     </Box>
   );
 };
