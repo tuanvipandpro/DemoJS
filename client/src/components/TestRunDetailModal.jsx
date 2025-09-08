@@ -35,6 +35,7 @@ import {
   History as HistoryIcon
 } from '@mui/icons-material';
 import { runsService } from '../services/runs';
+import PipelineSteps from './PipelineSteps';
 
 const TestRunDetailModal = ({ open, onClose, runId, onRunUpdate }) => {
   const [run, setRun] = useState(null);
@@ -249,15 +250,24 @@ const TestRunDetailModal = ({ open, onClose, runId, onRunUpdate }) => {
         {/* Tabs */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
+            <Tab icon={<PlayIcon />} label="Pipeline" />
             <Tab icon={<CodeIcon />} label="Test Plan" />
-            <Tab icon={<BugReportIcon />} label="Proposals" />
+            <Tab icon={<BugReportIcon />} label="Test Cases" />
             <Tab icon={<AssessmentIcon />} label="Results" />
             <Tab icon={<HistoryIcon />} label="Logs" />
           </Tabs>
         </Box>
 
-        {/* Test Plan Tab */}
+        {/* Pipeline Tab */}
         <TabPanel value={activeTab} index={0}>
+          <PipelineSteps 
+            currentState={run.state} 
+            errorMessage={run.errorMessage}
+          />
+        </TabPanel>
+
+        {/* Test Plan Tab */}
+        <TabPanel value={activeTab} index={1}>
           {run.testPlan ? (
             <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
               <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: '0.875rem' }}>
@@ -271,8 +281,8 @@ const TestRunDetailModal = ({ open, onClose, runId, onRunUpdate }) => {
           )}
         </TabPanel>
 
-        {/* Proposals Tab */}
-        <TabPanel value={activeTab} index={1}>
+        {/* Test Cases Tab */}
+        <TabPanel value={activeTab} index={2}>
           {run.proposals && run.proposals.length > 0 ? (
             <List>
               {run.proposals.map((proposal, index) => (
@@ -284,15 +294,17 @@ const TestRunDetailModal = ({ open, onClose, runId, onRunUpdate }) => {
                     primary={proposal.title || `Proposal ${index + 1}`}
                     secondary={
                       <Box>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" component="div">
                           {proposal.description}
                         </Typography>
-                        {proposal.testType && (
-                          <Chip label={proposal.testType} size="small" sx={{ mt: 1 }} />
-                        )}
-                        {proposal.priority && (
-                          <Chip label={`Priority: ${proposal.priority}`} size="small" sx={{ mt: 1, ml: 1 }} />
-                        )}
+                        <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                          {proposal.testType && (
+                            <Chip label={proposal.testType} size="small" />
+                          )}
+                          {proposal.priority && (
+                            <Chip label={`Priority: ${proposal.priority}`} size="small" />
+                          )}
+                        </Box>
                       </Box>
                     }
                   />
@@ -307,7 +319,7 @@ const TestRunDetailModal = ({ open, onClose, runId, onRunUpdate }) => {
         </TabPanel>
 
         {/* Results Tab */}
-        <TabPanel value={activeTab} index={2}>
+        <TabPanel value={activeTab} index={3}>
           {run.testResults ? (
             <Box>
               <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -433,7 +445,7 @@ const TestRunDetailModal = ({ open, onClose, runId, onRunUpdate }) => {
         </TabPanel>
 
         {/* Logs Tab */}
-        <TabPanel value={activeTab} index={3}>
+        <TabPanel value={activeTab} index={4}>
           {logs.length > 0 ? (
             <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
               <List>
@@ -447,11 +459,11 @@ const TestRunDetailModal = ({ open, onClose, runId, onRunUpdate }) => {
                     <ListItemText
                       primary={log.message}
                       secondary={
-                        <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography variant="caption" color="text.secondary">
                             {formatDate(log.timestamp)}
                           </Typography>
-                          <Chip label={log.level} size="small" sx={{ ml: 1 }} />
+                          <Chip label={log.level} size="small" />
                         </Box>
                       }
                     />

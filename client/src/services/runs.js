@@ -58,11 +58,9 @@ export const runsService = {
   },
 
   // Approve test cases
-  approveTestCases: async (runId, approvedTestCases) => {
+  approveTestCases: async (runId) => {
     try {
-      const response = await api.post(`${RUNS_API}/${runId}/approve`, {
-        approvedTestCases
-      });
+      const response = await api.post(`${RUNS_API}/${runId}/approve-test-cases`);
       return response.data;
     } catch (error) {
       console.error('Error approving test cases:', error);
@@ -70,16 +68,61 @@ export const runsService = {
     }
   },
 
-  // Execute approved tests
-  executeTests: async (runId) => {
+  // Approve test report
+  approveReport: async (runId) => {
     try {
-      const response = await api.post(`${RUNS_API}/${runId}/execute`);
+      const response = await api.post(`${RUNS_API}/${runId}/approve-report`);
       return response.data;
     } catch (error) {
-      console.error('Error executing tests:', error);
+      console.error('Error approving report:', error);
       throw error;
     }
   },
+
+  // Reject test cases
+  rejectTestCases: async (runId) => {
+    try {
+      const response = await api.post(`${RUNS_API}/${runId}/reject-test-cases`);
+      return response.data;
+    } catch (error) {
+      console.error('Error rejecting test cases:', error);
+      throw error;
+    }
+  },
+
+  // Reject test report
+  rejectReport: async (runId) => {
+    try {
+      const response = await api.post(`${RUNS_API}/${runId}/reject-report`);
+      return response.data;
+    } catch (error) {
+      console.error('Error rejecting report:', error);
+      throw error;
+    }
+  },
+
+  // Get test cases for a run
+  getTestCases: async (runId) => {
+    try {
+      const response = await api.get(`${RUNS_API}/${runId}/test-cases`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching test cases:', error);
+      throw error;
+    }
+  },
+
+  // Get step history for a run
+  getStepHistory: async (runId) => {
+    try {
+      const response = await api.get(`${RUNS_API}/${runId}/step-history`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching step history:', error);
+      throw error;
+    }
+  },
+
 
   // Record decision for completed test run
   recordDecision: async (runId, decision, decisionData = {}) => {

@@ -26,7 +26,8 @@ import {
   AccordionSummary,
   AccordionDetails,
   IconButton,
-  Tooltip
+  Tooltip,
+  Pagination
 } from '@mui/material';
 import {
   CheckCircle as CheckIcon,
@@ -40,6 +41,7 @@ import {
   Merge as MergeIcon
 } from '@mui/icons-material';
 import { runsService } from '../services/runs';
+import PipelineSteps from './PipelineSteps';
 
 const RunPipelineModal = ({ open, onClose, runId }) => {
   const [run, setRun] = useState(null);
@@ -47,6 +49,9 @@ const RunPipelineModal = ({ open, onClose, runId }) => {
   const [error, setError] = useState(null);
   const [selectedTestCases, setSelectedTestCases] = useState([]);
   const [approving, setApproving] = useState(false);
+  const [pipelineKey, setPipelineKey] = useState(0);
+  const [testCasesPage, setTestCasesPage] = useState(0);
+  const [testCasesPerPage, setTestCasesPerPage] = useState(10);
 
   useEffect(() => {
     if (open && runId) {
@@ -54,20 +59,40 @@ const RunPipelineModal = ({ open, onClose, runId }) => {
     }
   }, [open, runId]);
 
-  // Auto-refresh khi run đang trong progress
+  // Force refresh PipelineSteps when run state changes
   useEffect(() => {
-    if (!open || !run) return;
-
-    const isInProgress = ['queued', 'fetching_code', 'generating_test_cases', 'generating_test_scripts', 'creating_mr'].includes(run.state);
-    
-    if (isInProgress) {
-      const interval = setInterval(() => {
-        fetchRunDetails();
-      }, 3000); // Refresh mỗi 3 giây
-
-      return () => clearInterval(interval);
+    if (run) {
+      setPipelineKey(prev => prev + 1);
     }
-  }, [open, run?.state]);
+  }, [run?.state, run?.proposals_json]);
+
+  // Auto-refresh logic removed - user will manually refresh when needed
+
+  const isActiveState = (state) => {
+    const activeStates = ['queued', 'pulling_code', 'generating_tests', 'generating_scripts', 'running_tests', 'generating_report'];
+    return activeStates.includes(state);
+  };
+
+  const isWaitingForApproval = (state) => {
+    const approvalStates = ['test_approval', 'report_approval'];
+    return approvalStates.includes(state);
+  };
+
+  const getStatusColor = (state) => {
+    const stateMap = {
+      'queued': 'default',
+      'pulling_code': 'primary',
+      'generating_tests': 'primary',
+      'test_approval': 'warning',
+      'generating_scripts': 'primary',
+      'running_tests': 'primary',
+      'generating_report': 'primary',
+      'report_approval': 'warning',
+      'completed': 'success',
+      'failed': 'error'
+    };
+    return stateMap[state] || 'default';
+  };
 
   const fetchRunDetails = async () => {
     try {
@@ -78,11 +103,11 @@ const RunPipelineModal = ({ open, onClose, runId }) => {
       if (response.success) {
         setRun(response.run);
         
-        // Auto-select all test cases if in proposals state
-        if (response.run.state === 'proposals' && response.run.proposalsJson) {
-          const testCases = Array.isArray(response.run.proposalsJson) 
-            ? response.run.proposalsJson 
-            : JSON.parse(response.run.proposalsJson || '[]');
+        // Auto-select all test cases if in proposals or test_approval state
+        if ((response.run.state === 'proposals' || response.run.state === 'test_approval') && response.run.proposals_json) {
+          const testCases = Array.isArray(response.run.proposals_json) 
+            ? response.run.proposals_json 
+            : JSON.parse(response.run.proposals_json || '[]');
           setSelectedTestCases(testCases.map(tc => tc.id));
         }
       } else {
@@ -98,10 +123,26 @@ const RunPipelineModal = ({ open, onClose, runId }) => {
 
   const handleTestCaseToggle = (testCaseId) => {
     setSelectedTestCases(prev => 
-      prev.includes(testCaseId)
+      prev.includes(testCaseId) 
         ? prev.filter(id => id !== testCaseId)
         : [...prev, testCaseId]
     );
+  };
+
+  // Calculate pagination for test cases
+  const testCases = run?.proposals_json ? (Array.isArray(run.proposals_json) ? run.proposals_json : JSON.parse(run.proposals_json || '[]')) : [];
+  const totalPages = Math.ceil(testCases.length / testCasesPerPage);
+  const startIndex = testCasesPage * testCasesPerPage;
+  const endIndex = startIndex + testCasesPerPage;
+  const paginatedTestCases = testCases.slice(startIndex, endIndex);
+
+  const handleTestCasesPageChange = (event, page) => {
+    setTestCasesPage(page - 1); // MUI Pagination is 1-based
+  };
+
+  const handleTestCasesPerPageChange = (event) => {
+    setTestCasesPerPage(event.target.value);
+    setTestCasesPage(0); // Reset to first page
   };
 
   const handleApproveTestCases = async () => {
@@ -114,9 +155,9 @@ const RunPipelineModal = ({ open, onClose, runId }) => {
       setApproving(true);
       setError(null);
       
-      const testCases = Array.isArray(run.proposalsJson) 
-        ? run.proposalsJson 
-        : JSON.parse(run.proposalsJson || '[]');
+      const testCases = Array.isArray(run.proposals_json) 
+        ? run.proposals_json 
+        : JSON.parse(run.proposals_json || '[]');
       
       const approvedTestCases = testCases.filter(tc => selectedTestCases.includes(tc.id));
       
@@ -135,31 +176,6 @@ const RunPipelineModal = ({ open, onClose, runId }) => {
     }
   };
 
-  const getStepIcon = (step, currentStep, runState) => {
-    if (step < currentStep) return <CheckIcon color="success" />;
-    if (step === currentStep) {
-      // Hiển thị loading nếu đang trong progress
-      const isInProgress = ['queued', 'fetching_code', 'generating_test_cases', 'generating_test_scripts', 'creating_mr'].includes(runState);
-      if (isInProgress) {
-        return <CircularProgress size={20} />;
-      }
-      // Nếu đang chờ approval
-      if (runState === 'proposals') {
-        return <ScheduleIcon color="warning" />;
-      }
-      // Nếu failed
-      if (runState === 'failed') {
-        return <ErrorIcon color="error" />;
-      }
-    }
-    return <ScheduleIcon color="disabled" />;
-  };
-
-  const getStepStatus = (step, currentStep) => {
-    if (step < currentStep) return 'completed';
-    if (step === currentStep) return 'active';
-    return 'pending';
-  };
 
   const getStateInfo = (state) => {
     const stateMap = {
@@ -177,16 +193,6 @@ const RunPipelineModal = ({ open, onClose, runId }) => {
     return stateMap[state] || { label: state, color: 'default', icon: <ScheduleIcon /> };
   };
 
-  const steps = [
-    { label: 'Fetch Code', state: 'fetching_code' },
-    { label: 'Generate Test Cases', state: 'generating_test_cases' },
-    { label: 'Review & Approve', state: 'proposals' },
-    { label: 'Generate Test Scripts', state: 'generating_test_scripts' },
-    { label: 'Create Merge Request', state: 'creating_mr' },
-    { label: 'Completed', state: 'completed' }
-  ];
-
-  const currentStepIndex = steps.findIndex(step => step.state === run?.state);
 
   if (loading && !run) {
     return (
@@ -277,186 +283,157 @@ const RunPipelineModal = ({ open, onClose, runId }) => {
         {/* Pipeline Steps */}
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Typography variant="h6" gutterBottom>Pipeline Progress</Typography>
-            <Stepper activeStep={currentStepIndex} orientation="vertical">
-              {steps.map((step, index) => (
-                                 <Step key={step.label} completed={index < currentStepIndex}>
-                   <StepLabel
-                     icon={getStepIcon(index, currentStepIndex, run?.state)}
-                     error={run?.state === 'failed' && index === currentStepIndex}
-                   >
-                     {step.label}
-                   </StepLabel>
-                  <StepContent>
-                    {/* Status message cho từng step */}
-                    {step.state === run?.state && (
-                      <Box sx={{ mt: 1, mb: 2 }}>
-                        {run?.state === 'fetching_code' && (
-                          <Alert severity="info">
-                            <Typography variant="body2">
-                              Đang tải source code từ branch <strong>{run?.branch}</strong>...
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+              <Typography variant="h6">Pipeline Progress</Typography>
+              {run && (
+                <Chip 
+                  label={run.state.replace('_', ' ').toUpperCase()} 
+                  color={getStatusColor(run.state)}
+                  size="small"
+                  icon={isActiveState(run.state) ? <CircularProgress size={16} /> : null}
+                />
+              )}
+            </Box>
+            <PipelineSteps 
+              key={pipelineKey}
+              currentState={run?.state}
+              errorMessage={run?.errorMessage}
+              isFailed={run?.state === 'failed'}
+              run={run}
+              onRunUpdate={(updatedRun) => {
+                setRun(updatedRun);
+                // Force re-render of PipelineSteps
+                setPipelineKey(prev => prev + 1);
+              }}
+            />
+            
+            {/* Test Cases Approval Section */}
+            {run?.state === 'test_approval' && run?.proposals_json && (
+              <Box sx={{ mt: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle2">
+                    Generated Test Cases ({testCases.length})
+                  </Typography>
+                  {testCases.length > 0 && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <FormControl size="small" sx={{ minWidth: 80 }}>
+                        <InputLabel>Per page</InputLabel>
+                        <Select
+                          value={testCasesPerPage}
+                          label="Per page"
+                          onChange={handleTestCasesPerPageChange}
+                        >
+                          <MenuItem value={5}>5</MenuItem>
+                          <MenuItem value={10}>10</MenuItem>
+                          <MenuItem value={20}>20</MenuItem>
+                          <MenuItem value={50}>50</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Box>
+                  )}
+                </Box>
+                <Box sx={{ maxHeight: 400, overflow: 'auto', border: '1px solid #e0e0e0', borderRadius: 1, p: 1 }}>
+                  <List dense>
+                    {paginatedTestCases.map((testCase, index) => (
+                      <ListItem key={testCase.id || index} dense sx={{ borderBottom: '1px solid #f0f0f0', flexDirection: 'column', alignItems: 'stretch' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+                          <ListItemIcon sx={{ minWidth: 'auto', mr: 1, mt: 0.5 }}>
+                            <Checkbox
+                              checked={selectedTestCases.includes(testCase.id || index)}
+                              onChange={() => handleTestCaseToggle(testCase.id || index)}
+                            />
+                          </ListItemIcon>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                              {testCase.id || `Test Case ${index + 1}`}
                             </Typography>
-                          </Alert>
-                        )}
-                        {run?.state === 'generating_test_cases' && (
-                          <Alert severity="info">
-                            <Typography variant="body2">
-                              Đang tạo test cases dựa trên source code và instruction...
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                              {testCase.description || 'No description available'}
                             </Typography>
-                          </Alert>
-                        )}
-                        {run?.state === 'generating_test_scripts' && (
-                          <Alert severity="info">
-                            <Typography variant="body2">
-                              Đang tạo test scripts từ approved test cases...
-                            </Typography>
-                          </Alert>
-                        )}
-                        {run?.state === 'creating_mr' && (
-                          <Alert severity="info">
-                            <Typography variant="body2">
-                              Đang tạo Merge Request với test scripts...
-                            </Typography>
-                          </Alert>
-                        )}
-                      </Box>
-                    )}
-                    
-                    {step.state === 'proposals' && run?.proposalsJson && (
-                       <Box sx={{ mt: 2 }}>
-                         <Typography variant="subtitle2" gutterBottom>
-                           Generated Test Cases ({Array.isArray(run.proposalsJson) ? run.proposalsJson.length : JSON.parse(run.proposalsJson || '[]').length})
-                         </Typography>
-                         <Box sx={{ maxHeight: 400, overflow: 'auto', border: '1px solid #e0e0e0', borderRadius: 1, p: 1 }}>
-                           <List dense>
-                             {(Array.isArray(run.proposalsJson) ? run.proposalsJson : JSON.parse(run.proposalsJson || '[]')).map((testCase, index) => (
-                               <ListItem key={testCase.id || index} dense sx={{ borderBottom: '1px solid #f0f0f0' }}>
-                                 <ListItemIcon>
-                                   <Checkbox
-                                     checked={selectedTestCases.includes(testCase.id || index)}
-                                     onChange={() => handleTestCaseToggle(testCase.id || index)}
-                                   />
-                                 </ListItemIcon>
-                                 <ListItemText
-                                   primary={
-                                     <Box>
-                                       <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                                         {testCase.title || `Test Case ${index + 1}`}
-                                       </Typography>
-                                       <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-                                         <Chip 
-                                           label={testCase.testType || 'unit'} 
-                                           size="small" 
-                                           color="primary" 
-                                           variant="outlined"
-                                         />
-                                         <Chip 
-                                           label={testCase.priority || 'medium'} 
-                                           size="small" 
-                                           color={testCase.priority === 'high' ? 'error' : testCase.priority === 'medium' ? 'warning' : 'default'}
-                                           variant="outlined"
-                                         />
-                                       </Box>
-                                     </Box>
-                                   }
-                                   secondary={
-                                     <Box sx={{ mt: 1 }}>
-                                       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                         {testCase.description || 'No description available'}
-                                       </Typography>
-                                       
-                                       {testCase.testSteps && testCase.testSteps.length > 0 && (
-                                         <Box>
-                                           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
-                                             Test Steps:
-                                           </Typography>
-                                           <List dense sx={{ py: 0 }}>
-                                             {testCase.testSteps.map((step, stepIndex) => (
-                                               <ListItem key={stepIndex} dense sx={{ py: 0, pl: 2 }}>
-                                                 <ListItemText
-                                                   primary={
-                                                     <Typography variant="caption" color="text.secondary">
-                                                       {stepIndex + 1}. {step}
-                                                     </Typography>
-                                                   }
-                                                 />
-                                               </ListItem>
-                                             ))}
-                                           </List>
-                                         </Box>
-                                       )}
-                                       
-                                       {testCase.expectedResult && (
-                                         <Box sx={{ mt: 1 }}>
-                                           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
-                                             Expected Result:
-                                           </Typography>
-                                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                             {testCase.expectedResult}
-                                           </Typography>
-                                         </Box>
-                                       )}
-                                       
-                                       {testCase.testData && (
-                                         <Box sx={{ mt: 1 }}>
-                                           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 'bold' }}>
-                                             Test Data:
-                                           </Typography>
-                                           <pre style={{ 
-                                             fontSize: '10px', 
-                                             backgroundColor: '#f5f5f5', 
-                                             padding: '4px', 
-                                             borderRadius: '4px',
-                                             margin: '4px 0',
-                                             overflow: 'auto',
-                                             maxHeight: '100px'
-                                           }}>
-                                             {JSON.stringify(testCase.testData, null, 2)}
-                                           </pre>
-                                         </Box>
-                                       )}
-                                     </Box>
-                                   }
-                                 />
-                               </ListItem>
-                             ))}
-                           </List>
-                         </Box>
-                         
-                         <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                           <Typography variant="body2" color="text.secondary">
-                             {selectedTestCases.length} of {(Array.isArray(run.proposalsJson) ? run.proposalsJson : JSON.parse(run.proposalsJson || '[]')).length} test cases selected
-                           </Typography>
-                           <Box sx={{ display: 'flex', gap: 1 }}>
-                             <Button
-                               size="small"
-                               onClick={() => {
-                                 const allTestCases = Array.isArray(run.proposalsJson) ? run.proposalsJson : JSON.parse(run.proposalsJson || '[]');
-                                 setSelectedTestCases(allTestCases.map(tc => tc.id || allTestCases.indexOf(tc)));
-                               }}
-                             >
-                               Select All
-                             </Button>
-                             <Button
-                               size="small"
-                               onClick={() => setSelectedTestCases([])}
-                             >
-                               Clear All
-                             </Button>
-                           </Box>
-                         </Box>
-                       </Box>
-                     )}
-                    
-                    {run?.errorMessage && run.state === 'failed' && (
-                      <Alert severity="error" sx={{ mt: 2 }}>
-                        {run.errorMessage}
-                      </Alert>
-                    )}
-                  </StepContent>
-                </Step>
-              ))}
-            </Stepper>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                              <Box>
+                                <Typography variant="caption" component="div" color="text.secondary" sx={{ fontWeight: 'bold', display: 'block', mb: 0.5 }}>
+                                  INPUT:
+                                </Typography>
+                                <Typography variant="body2" component="pre" sx={{ 
+                                  fontFamily: 'monospace', 
+                                  fontSize: '0.75rem',
+                                  backgroundColor: '#f5f5f5',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #e0e0e0',
+                                  display: 'block',
+                                  margin: 0,
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word'
+                                }}>
+                                  {testCase.input ? JSON.stringify(testCase.input, null, 2) : 'No input specified'}
+                                </Typography>
+                              </Box>
+                              <Box>
+                                <Typography variant="caption" component="div" color="text.secondary" sx={{ fontWeight: 'bold', display: 'block', mb: 0.5 }}>
+                                  EXPECTED:
+                                </Typography>
+                                <Typography variant="body2" component="pre" sx={{ 
+                                  fontFamily: 'monospace', 
+                                  fontSize: '0.75rem',
+                                  backgroundColor: '#e8f5e8',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #c8e6c9',
+                                  display: 'block',
+                                  margin: 0,
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word'
+                                }}>
+                                  {testCase.expected ? JSON.stringify(testCase.expected, null, 2) : 'No expected result specified'}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </Box>
+                        </Box>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+                {totalPages > 1 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                    <Pagination
+                      count={totalPages}
+                      page={testCasesPage + 1}
+                      onChange={handleTestCasesPageChange}
+                      color="primary"
+                      size="small"
+                      showFirstButton
+                      showLastButton
+                    />
+                  </Box>
+                )}
+                
+                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {selectedTestCases.length} of {(Array.isArray(run.proposals_json) ? run.proposals_json : JSON.parse(run.proposals_json || '[]')).length} test cases selected
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        const allTestCases = Array.isArray(run.proposals_json) ? run.proposals_json : JSON.parse(run.proposals_json || '[]');
+                        setSelectedTestCases(allTestCases.map(tc => tc.id || allTestCases.indexOf(tc)));
+                      }}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() => setSelectedTestCases([])}
+                    >
+                      Clear All
+                    </Button>
+                  </Box>
+                </Box>
+              </Box>
+            )}
           </CardContent>
         </Card>
 
@@ -482,7 +459,7 @@ const RunPipelineModal = ({ open, onClose, runId }) => {
       
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
-        {run?.state === 'proposals' && (
+        {(run?.state === 'proposals' || run?.state === 'test_approval') && (
           <Button
             variant="contained"
             onClick={handleApproveTestCases}

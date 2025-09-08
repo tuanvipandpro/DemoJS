@@ -6,7 +6,7 @@ const options = {
     info: {
       title: 'InsightTestAI API',
       version: '1.0.0',
-      description: 'API for InsightTestAI - AI-powered testing automation system with RAG capabilities',
+      description: 'API for InsightTestAI - AI-powered testing automation system with RAG capabilities, LangChain integration, and AI services for intelligent test generation',
       contact: {
         name: 'InsightTestAI Team',
         email: 'support@insighttestai.com'
@@ -217,13 +217,21 @@ const options = {
               type: 'integer',
               example: 1
             },
+            projectName: {
+              type: 'string',
+              example: 'My Test Project'
+            },
             userId: {
               type: 'integer',
               example: 1
             },
+            userEmail: {
+              type: 'string',
+              example: 'user@example.com'
+            },
             state: {
               type: 'string',
-              enum: ['queued', 'planning', 'proposals', 'approved', 'executing', 'completed', 'failed'],
+              enum: ['queued', 'pulling_code', 'generating_tests', 'test_approval', 'generating_scripts', 'running_tests', 'generating_report', 'report_approval', 'completed', 'failed'],
               example: 'completed'
             },
             commitId: {
@@ -234,18 +242,237 @@ const options = {
               type: 'string',
               example: 'main'
             },
+            diffSummary: {
+              type: 'string',
+              example: 'Added new authentication module'
+            },
+            testPlan: {
+              type: 'string',
+              example: 'Test plan for authentication module'
+            },
+            proposals: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/TestCase' },
+              example: []
+            },
+            approvedTestCases: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/TestCase' },
+              example: []
+            },
+            testScripts: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/TestScript' },
+              example: []
+            },
+            testResults: {
+              type: 'object',
+              properties: {
+                total: { type: 'integer', example: 10 },
+                passed: { type: 'integer', example: 8 },
+                failed: { type: 'integer', example: 2 },
+                duration: { type: 'string', example: '30s' },
+                coverage: { $ref: '#/components/schemas/Coverage' }
+              }
+            },
+            coverage: {
+              $ref: '#/components/schemas/Coverage'
+            },
+            reportUrl: {
+              type: 'string',
+              example: 'https://s3.amazonaws.com/bucket/reports/run-1-report.json'
+            },
+            mrUrl: {
+              type: 'string',
+              example: 'https://github.com/user/repo/pull/123'
+            },
+            mrNumber: {
+              type: 'integer',
+              example: 123
+            },
             confidenceScore: {
               type: 'number',
               format: 'float',
               example: 0.85
             },
+            errorMessage: {
+              type: 'string',
+              example: 'Test execution failed due to timeout'
+            },
+            decision: {
+              type: 'string',
+              enum: ['commit', 'pr', 'none'],
+              example: 'pr'
+            },
+            decisionData: {
+              type: 'object',
+              example: { reason: 'All tests passed', confidence: 0.95 }
+            },
+            reportUrl: {
+              type: 'string',
+              example: 'https://s3.amazonaws.com/bucket/reports/run-1-report.json',
+              description: 'S3 URL for the test report'
+            },
+            mrUrl: {
+              type: 'string',
+              example: 'https://github.com/user/repo/pull/123',
+              description: 'Git merge request URL'
+            },
+            mrNumber: {
+              type: 'integer',
+              example: 123,
+              description: 'Git merge request number'
+            },
             createdAt: {
+              type: 'string',
+              format: 'date-time'
+            },
+            updatedAt: {
               type: 'string',
               format: 'date-time'
             },
             finishedAt: {
               type: 'string',
               format: 'date-time'
+            }
+          }
+        },
+        TestCase: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              example: 'test_case_1',
+              description: 'Unique identifier for the test case'
+            },
+            description: {
+              type: 'string',
+              example: 'Test the authentication functionality',
+              description: 'Detailed description of what this test case covers'
+            },
+            input: {
+              type: 'object',
+              example: {"method": "POST", "url": "/api/auth", "body": {"username": "test", "password": "test123"}},
+              description: 'Input data for the test case'
+            },
+            expected: {
+              type: 'object',
+              example: {"statusCode": 200, "body": {"token": "jwt_token"}},
+              description: 'Expected result of the test case'
+            }
+          }
+        },
+        TestScript: {
+          type: 'object',
+          properties: {
+            path: {
+              type: 'string',
+              example: 'tests/auth.test.js'
+            },
+            content: {
+              type: 'string',
+              example: 'describe("Authentication", () => { test("should authenticate user", () => { ... }); });'
+            }
+          }
+        },
+        TestReport: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              example: 1
+            },
+            runId: {
+              type: 'integer',
+              example: 1
+            },
+            reportType: {
+              type: 'string',
+              enum: ['coverage', 'execution', 'summary'],
+              example: 'summary'
+            },
+            reportData: {
+              type: 'object',
+              properties: {
+                summary: {
+                  type: 'object',
+                  properties: {
+                    totalTests: { type: 'integer', example: 10 },
+                    passedTests: { type: 'integer', example: 8 },
+                    failedTests: { type: 'integer', example: 2 },
+                    passRate: { type: 'string', example: '80.00' },
+                    duration: { type: 'string', example: '30s' }
+                  }
+                },
+                coverage: { $ref: '#/components/schemas/Coverage' },
+                testDetails: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      path: { type: 'string', example: 'tests/auth.test.js' },
+                      status: { type: 'string', enum: ['passed', 'failed'], example: 'passed' },
+                      duration: { type: 'string', example: '2s' },
+                      issues: { type: 'array', items: { type: 'string' }, example: [] }
+                    }
+                  }
+                },
+                recommendations: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  example: ['Add more test cases for edge conditions', 'Improve error handling tests']
+                },
+                qualityScore: {
+                  type: 'integer',
+                  example: 85
+                },
+                riskAssessment: {
+                  type: 'string',
+                  enum: ['low', 'medium', 'high'],
+                  example: 'low'
+                },
+                generatedBy: {
+                  type: 'string',
+                  example: 'LangChain AI'
+                }
+              }
+            },
+            s3Url: {
+              type: 'string',
+              example: 'https://s3.amazonaws.com/bucket/reports/run-1-report.json'
+            },
+            filePath: {
+              type: 'string',
+              example: 'reports/run-1/summary-1234567890.json'
+            },
+            status: {
+              type: 'string',
+              enum: ['pending', 'approved', 'rejected'],
+              example: 'pending'
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time'
+            }
+          }
+        },
+        Coverage: {
+          type: 'object',
+          properties: {
+            lines: {
+              type: 'integer',
+              example: 85,
+              description: 'Line coverage percentage'
+            },
+            branches: {
+              type: 'integer',
+              example: 80,
+              description: 'Branch coverage percentage'
+            },
+            functions: {
+              type: 'integer',
+              example: 90,
+              description: 'Function coverage percentage'
             }
           }
         },
@@ -390,7 +617,11 @@ const options = {
       },
       {
         name: 'Test Runs',
-        description: 'Test execution and run management'
+        description: 'Test execution and run management with AI-powered pipeline'
+      },
+      {
+        name: 'AI Services',
+        description: 'LangChain and AI services integration for intelligent test generation'
       },
       {
         name: 'Statistics',

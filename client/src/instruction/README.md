@@ -1,15 +1,15 @@
 # Test Instruction Templates
 
-Bộ sưu tập các mẫu instruction test view point cho AI generate test case và test script, tập trung vào **Unit Testing**.
+Bộ sưu tập các mẫu instruction đơn giản cho AI generate test cases, tập trung vào **Unit Testing**.
 
 ## 📁 Cấu trúc thư mục
 
 ```
 instruction/
 ├── index.json                    # File tổng hợp tất cả templates
-├── javascript-ut-templates.json  # Templates cho JavaScript (Jest)
-├── java-ut-templates.json        # Templates cho Java (JUnit 5)
-├── python-ut-templates.json      # Templates cho Python (pytest)
+├── javascript-ut-templates.json  # Templates đơn giản cho JavaScript (Jest)
+├── java-ut-templates.json        # Templates đơn giản cho Java (JUnit 5)
+├── python-ut-templates.json      # Templates đơn giản cho Python (pytest)
 └── README.md                     # Hướng dẫn sử dụng
 ```
 
@@ -17,115 +17,89 @@ instruction/
 
 Các template này được thiết kế để:
 
-- **Hướng dẫn AI** trong việc generate test cases và test scripts
-- **Đảm bảo coverage** đầy đủ các khía cạnh testing
-- **Chuẩn hóa** cách tiếp cận testing cho từng ngôn ngữ
-- **Tăng chất lượng** test cases được tạo ra
+- **Hướng dẫn AI** tạo test cases đơn giản và hiệu quả
+- **Focus vào input/output validation** - điều quan trọng nhất
+- **Đơn giản hóa** quá trình tạo test cases
+- **Tăng tốc độ** generate test cases
 
 ## 🚀 Cách sử dụng
 
 ### 1. Chọn template phù hợp
 
-Dựa vào ngôn ngữ lập trình và testing framework:
+Dựa vào ngôn ngữ lập trình:
 
 - **JavaScript**: Sử dụng `javascript-ut-templates.json` với Jest
 - **Java**: Sử dụng `java-ut-templates.json` với JUnit 5  
 - **Python**: Sử dụng `python-ut-templates.json` với pytest
 
-### 2. Áp dụng Test Viewpoints
+### 2. Focus vào Input/Output
 
-Mỗi template chứa các **viewpoints** khác nhau:
+Mỗi template tập trung vào:
 
-- **Input validation testing**: Test với các input không hợp lệ
-- **Output validation testing**: Kiểm tra output đúng định dạng
-- **Edge case testing**: Test với các trường hợp đặc biệt
-- **Error handling testing**: Test xử lý lỗi
-- **Boundary value testing**: Test với giá trị biên
+- **Input validation**: Test với các input khác nhau
+- **Output validation**: Kiểm tra kết quả mong đợi
+- **Edge cases**: Test với null, empty, boundary values
+- **Error handling**: Test xử lý lỗi
 
-### 3. Sử dụng Test Patterns
+### 3. Format đơn giản
 
-Áp dụng các mẫu thiết kế test:
+Mỗi test case chỉ cần:
 
-- **Arrange-Act-Assert (AAA)**: Chuẩn bị - Thực thi - Kiểm tra
-- **Given-When-Then**: Cho trước - Khi - Thì
-- **Setup-Execute-Verify**: Thiết lập - Thực thi - Xác minh
-
-### 4. Tập trung vào Coverage
-
-Đảm bảo đạt được các loại coverage:
-
-- **Statement coverage**: Bao phủ tất cả các câu lệnh
-- **Branch coverage**: Bao phủ tất cả các nhánh logic
-- **Function coverage**: Bao phủ tất cả các function/method
+- **Input**: Dữ liệu đầu vào
+- **Expected**: Kết quả mong đợi
+- **Description**: Mô tả ngắn gọn
 
 ## 📋 Ví dụ sử dụng
 
-### JavaScript Function Testing
+### JavaScript Basic Testing
 
 ```javascript
-// Sử dụng template "js-ut-function-testing"
+// Sử dụng template "js-basic-testing"
 describe('calculateSum', () => {
-  // Viewpoint: Input validation testing
-  test('should handle null input', () => {
-    // Arrange
-    const input = null;
-    
-    // Act & Assert
-    expect(() => calculateSum(input)).toThrow('Input cannot be null');
+  test('should return sum of valid numbers', () => {
+    // Input: [1, 2, 3]
+    // Expected: 6
+    expect(calculateSum([1, 2, 3])).toBe(6);
   });
   
-  // Viewpoint: Edge case testing
   test('should handle empty array', () => {
-    // Arrange
-    const input = [];
-    
-    // Act
-    const result = calculateSum(input);
-    
-    // Assert
-    expect(result).toBe(0);
+    // Input: []
+    // Expected: 0
+    expect(calculateSum([])).toBe(0);
   });
 });
 ```
 
-### Java Method Testing
+### Java Basic Testing
 
 ```java
-// Sử dụng template "java-ut-method-testing"
+// Sử dụng template "java-basic-testing"
 @Test
-@DisplayName("Should handle null parameters")
-void testMethodWithNullParameters() {
-    // Arrange
-    String input = null;
-    
-    // Act & Assert
-    assertThrows(IllegalArgumentException.class, 
-                 () -> utilityMethod(input));
+void testMethodWithValidInput() {
+    // Input: "hello"
+    // Expected: "HELLO"
+    assertEquals("HELLO", utilityMethod("hello"));
 }
 ```
 
-### Python Class Testing
+### Python Basic Testing
 
 ```python
-# Sử dụng template "python-ut-class-testing"
-class TestCalculator:
-    def test_init_with_valid_parameters(self):
-        # Arrange & Act
-        calc = Calculator(10, 20)
-        
-        # Assert
-        assert calc.value1 == 10
-        assert calc.value2 == 20
+# Sử dụng template "python-basic-testing"
+def test_calculate_sum():
+    # Input: [1, 2, 3]
+    # Expected: 6
+    assert calculate_sum([1, 2, 3]) == 6
 ```
 
 ## 🔧 Tùy chỉnh
 
 Bạn có thể:
 
-1. **Thêm viewpoints mới** vào các template
+1. **Thêm instruction mới** vào các template
 2. **Tạo template mới** cho ngôn ngữ khác
-3. **Mở rộng examples** với các trường hợp cụ thể
-4. **Thêm best practices** mới
+3. **Đơn giản hóa thêm** các instruction hiện có
+4. **Focus vào input/output** validation
 
 ## 📚 Tài liệu tham khảo
 

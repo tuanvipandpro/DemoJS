@@ -36,6 +36,7 @@ const TestRuns = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -57,6 +58,31 @@ const TestRuns = () => {
   useEffect(() => {
     fetchRuns();
   }, [filters]);
+
+  // Auto-refresh for active runs
+  useEffect(() => {
+    let interval;
+    
+    if (autoRefresh) {
+      interval = setInterval(() => {
+        fetchRuns();
+      }, 30000); // Refresh every 30 seconds
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [autoRefresh, filters]);
+
+  // Check if there are any active runs
+  useEffect(() => {
+    const hasActiveRuns = runs.some(run => 
+      ['queued', 'pulling_code', 'generating_tests', 'generating_scripts', 'running_tests', 'generating_report'].includes(run.state)
+    );
+    setAutoRefresh(hasActiveRuns);
+  }, [runs]);
 
   const fetchData = async () => {
     try {
@@ -117,17 +143,22 @@ const TestRuns = () => {
   };
 
   const handleRunCreated = (newRun) => {
-
+    // Mở pipeline modal để hiển thị progress
+    setSelectedRunId(newRun.id);
+    setRunDetailModalOpen(true);
     fetchRuns();
   };
 
   const getStatusCounts = () => {
     const counts = {
       queued: 0,
-      planning: 0,
-      proposals: 0,
-      approved: 0,
-      executing: 0,
+      pulling_code: 0,
+      generating_tests: 0,
+      test_approval: 0,
+      generating_scripts: 0,
+      running_tests: 0,
+      generating_report: 0,
+      report_approval: 0,
       completed: 0,
       failed: 0
     };
@@ -144,14 +175,33 @@ const TestRuns = () => {
   const getStatusColor = (status) => {
     const statusColors = {
       queued: 'default',
-      planning: 'info',
-      proposals: 'warning',
-      approved: 'primary',
-      executing: 'secondary',
+      pulling_code: 'info',
+      generating_tests: 'info',
+      test_approval: 'warning',
+      generating_scripts: 'info',
+      running_tests: 'secondary',
+      generating_report: 'info',
+      report_approval: 'warning',
       completed: 'success',
       failed: 'error'
     };
     return statusColors[status] || 'default';
+  };
+
+  const getStatusLabel = (status) => {
+    const statusLabels = {
+      queued: 'Queued',
+      pulling_code: 'Pulling Code',
+      generating_tests: 'Generating Tests',
+      test_approval: 'Test Approval',
+      generating_scripts: 'Generating Scripts',
+      running_tests: 'Running Tests',
+      generating_report: 'Generating Report',
+      report_approval: 'Report Approval',
+      completed: 'Completed',
+      failed: 'Failed'
+    };
+    return statusLabels[status] || status;
   };
 
   const filteredRuns = runs.filter(run => {
@@ -204,6 +254,14 @@ const TestRuns = () => {
           >
             Create Run
           </Button>
+          {autoRefresh && (
+            <Chip
+              label="Auto-refreshing"
+              color="info"
+              variant="outlined"
+              size="small"
+            />
+          )}
         </Box>
       </Box>
 
@@ -223,7 +281,7 @@ const TestRuns = () => {
                   {count}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                  {getStatusLabel(status)}
                 </Typography>
               </CardContent>
             </Card>
@@ -279,10 +337,13 @@ const TestRuns = () => {
               >
                 <MenuItem value="">All Statuses</MenuItem>
                 <MenuItem value="queued">Queued</MenuItem>
-                <MenuItem value="planning">Planning</MenuItem>
-                <MenuItem value="proposals">Proposals</MenuItem>
-                <MenuItem value="approved">Approved</MenuItem>
-                <MenuItem value="executing">Executing</MenuItem>
+                <MenuItem value="pulling_code">Pulling Code</MenuItem>
+                <MenuItem value="generating_tests">Generating Tests</MenuItem>
+                <MenuItem value="test_approval">Test Approval</MenuItem>
+                <MenuItem value="generating_scripts">Generating Scripts</MenuItem>
+                <MenuItem value="running_tests">Running Tests</MenuItem>
+                <MenuItem value="generating_report">Generating Report</MenuItem>
+                <MenuItem value="report_approval">Report Approval</MenuItem>
                 <MenuItem value="completed">Completed</MenuItem>
                 <MenuItem value="failed">Failed</MenuItem>
               </Select>

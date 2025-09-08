@@ -27,7 +27,6 @@ import { runsService } from '../services/runs';
 import { gitService } from '../services/git';
 import { projectsService } from '../services/projects';
 import GitConnectModal from './GitConnectModal';
-import RunPipelineModal from './RunPipelineModal';
 
 const RunTestModal = ({ open, onClose, project, onRunCreated }) => {
   const [formData, setFormData] = useState({
@@ -41,8 +40,6 @@ const RunTestModal = ({ open, onClose, project, onRunCreated }) => {
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [showGitConnect, setShowGitConnect] = useState(false);
   const [gitConnected, setGitConnected] = useState(false);
-  const [pipelineModalOpen, setPipelineModalOpen] = useState(false);
-  const [createdRunId, setCreatedRunId] = useState(null);
 
   // Load branches khi modal mở
   useEffect(() => {
@@ -183,12 +180,10 @@ const RunTestModal = ({ open, onClose, project, onRunCreated }) => {
       });
       
       if (response.success) {
-        setCreatedRunId(response.run.id);
-        setPipelineModalOpen(true);
         onRunCreated(response.run);
-        // Không đóng modal ngay, để user có thể thấy pipeline
-        // onClose();
-        // resetForm();
+        // Đóng modal và để ProjectDetailModal xử lý pipeline
+        onClose();
+        resetForm();
       } else {
         throw new Error(response.error || 'Failed to create test run');
       }
@@ -404,17 +399,6 @@ const RunTestModal = ({ open, onClose, project, onRunCreated }) => {
         }}
       />
 
-      {/* Run Pipeline Modal */}
-      <RunPipelineModal
-        open={pipelineModalOpen}
-        onClose={() => {
-          setPipelineModalOpen(false);
-          // Đóng RunTestModal khi pipeline modal đóng
-          onClose();
-          resetForm();
-        }}
-        runId={createdRunId}
-      />
     </Dialog>
   );
 };

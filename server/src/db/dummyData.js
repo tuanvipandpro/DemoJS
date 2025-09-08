@@ -51,26 +51,17 @@ async function insertDummyData() {
     
     // Insert projects
     await client.query(`
-      INSERT INTO projects (owner_id, name, description, repo_url, git_provider_id, domain, notify_channel, config_json, status) 
+      INSERT INTO projects (id, owner_id, name, description, repo_url, git_provider_id, domain, personal_access_token, notify_channel, config_json, is_delete, is_disabled, status, created_at, updated_at, instruction_templates, custom_instructions, testing_language, testing_framework, instruction) 
       VALUES 
-        ($1, 'Frontend Web App', 'React-based web application for e-commerce', 'https://github.com/company/frontend-web-app', $2, 'github.com', 'email', '{"templateInstructions": ["unit-testing", "integration-testing"], "customInstructions": "Focus on component testing and API integration"}', 'active'),
-        ($1, 'Backend API Service', 'Node.js REST API service', 'https://gitlab.company.com/company/backend-api', $3, 'gitlab.company.com', 'slack', '{"templateInstructions": ["unit-testing", "security-testing"], "customInstructions": "Ensure proper error handling and security validation"}', 'active'),
-        ($4, 'Mobile App', 'React Native mobile application', 'https://github.com/company/mobile-app', $2, 'github.com', 'email', '{"templateInstructions": ["e2e-testing", "performance-testing"], "customInstructions": "Test cross-platform compatibility and performance"}', 'active')
+        (4, 1, 'Test', null, 'https://github.com/tuanvipandpro/DemoJS', 1, 'github.com', 'fG1PkFkPWvGTKTzAJM6T2mjZ0/AagXLvGpNSyzL77bLvolTSejKAV+ujvSvpr2gqKdn8J4uNGhLLAAMsyaw8yw==', 'email', '{}', false, false, 'active', '2025-09-05 17:50:49.983653', '2025-09-05 17:50:49.983653', '[]', null, null, null, '{"config": {"testingLanguage": "javascript", "testingFramework": "jest", "selectedTemplates": [1], "customInstructions": null}, "templates": [{"id": 1, "name": "JavaScript Unit Testing", "testCases": [], "viewpoints": ["Input validation testing", "Output validation testing", "Edge case testing", "Error handling testing", "Boundary value testing"], "description": "Mẫu instruction test view point cho JavaScript Unit Testing với Jest framework", "templateData": {"scope": "Unit Testing", "language": "JavaScript", "templates": [{"id": "js-ut-function-testing", "name": "Function Testing", "examples": ["Test function với null/undefined input", "Test function với empty string/array", "Test function với negative numbers", "Test function với very large numbers", "Test function với special characters"], "viewpoints": ["Input validation testing", "Output validation testing", "Edge case testing", "Error handling testing", "Boundary value testing"], "description": "Test các function đơn lẻ với các input/output khác nhau", "test_patterns": ["Arrange-Act-Assert (AAA)", "Given-When-Then", "Setup-Execute-Verify"], "coverage_focus": ["Statement coverage", "Branch coverage", "Function coverage"]}], "description": "Mẫu instruction test view point cho JavaScript Unit Testing sử dụng Jest framework", "testing_framework": "Jest"}, "testPatterns": ["Arrange-Act-Assert (AAA)", "Given-When-Then", "Setup-Execute-Verify"]}], "testingLanguage": "javascript", "testingFramework": "jest", "selectedTemplates": [1], "customInstructions": null}')
       RETURNING id;
-    `, [
-      adminUser.rows[0]?.id, 
-      githubProvider.rows[0]?.id, 
-      gitlabSelfhostProvider.rows[0]?.id,
-      dev1User.rows[0]?.id
-    ]);
+    `);
     
     // Get project IDs
-    const frontendProject = await client.query('SELECT id FROM projects WHERE name = $1', ['Frontend Web App']);
-    const backendProject = await client.query('SELECT id FROM projects WHERE name = $1', ['Backend API Service']);
-    const mobileProject = await client.query('SELECT id FROM projects WHERE name = $1', ['Mobile App']);
+    const testProject = await client.query('SELECT id FROM projects WHERE name = $1', ['Test']);
     
     // Insert project members
-    if (frontendProject.rows[0] && dev1User.rows[0] && dev2User.rows[0] && testerUser.rows[0]) {
+    if (testProject.rows[0] && dev1User.rows[0] && dev2User.rows[0] && testerUser.rows[0]) {
       await client.query(`
         INSERT INTO project_members (project_id, user_id, role, added_by) 
         VALUES 
@@ -78,31 +69,10 @@ async function insertDummyData() {
           ($1, $4, 'member', $3),
           ($1, $5, 'member', $3)
       `, [
-        frontendProject.rows[0].id, 
+        testProject.rows[0].id, 
         dev1User.rows[0].id, 
         adminUser.rows[0]?.id,
         dev2User.rows[0].id,
-        testerUser.rows[0].id
-      ]);
-    }
-    
-    if (backendProject.rows[0] && dev1User.rows[0]) {
-      await client.query(`
-        INSERT INTO project_members (project_id, user_id, role, added_by) 
-        VALUES ($1, $2, 'member', $3)
-      `, [backendProject.rows[0].id, dev1User.rows[0].id, adminUser.rows[0]?.id]);
-    }
-    
-    if (mobileProject.rows[0] && dev2User.rows[0] && testerUser.rows[0]) {
-      await client.query(`
-        INSERT INTO project_members (project_id, user_id, role, added_by) 
-        VALUES 
-          ($1, $2, 'member', $3),
-          ($1, $4, 'member', $3)
-      `, [
-        mobileProject.rows[0].id, 
-        dev2User.rows[0].id, 
-        dev1User.rows[0]?.id,
         testerUser.rows[0].id
       ]);
     }

@@ -26,3 +26,7 @@ dist-ssr
 # Database data directory (PostgreSQL)
 db/data/
 /db/
+
+# Temporary files and logs
+temp/
+*.tmp

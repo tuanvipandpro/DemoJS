@@ -34,6 +34,7 @@ import CreateProjectModal from '../components/CreateProjectModal';
 import ProjectDetailModal from '../components/ProjectDetailModal';
 import RunTestModal from '../components/RunTestModal';
 import RunPipelineModal from '../components/RunPipelineModal';
+import TestRunDetailModal from '../components/TestRunDetailModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { projectsService } from '../services/projects';
 import { runsService } from '../services/runs';
@@ -58,6 +59,7 @@ const Projects = () => {
   const [selectedProjectForPipeline, setSelectedProjectForPipeline] = useState(null);
   const [loadingRuns, setLoadingRuns] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState(null);
+  const [runDetailModalOpen, setRunDetailModalOpen] = useState(false);
 
   useEffect(() => {
     fetchProjects();
@@ -161,7 +163,9 @@ const Projects = () => {
 
   const handleRunCreated = (newRun) => {
     setRunTestModalOpen(false);
-    // Optionally show success message or refresh data
+    // Mở RunPipelineModal thay vì ProjectDetailModal
+    setSelectedRunId(newRun.id);
+    setPipelineModalOpen(true);
   };
 
   const handleConfirmRun = async () => {
@@ -422,6 +426,7 @@ const Projects = () => {
           project={selectedProject}
           onProjectUpdated={handleProjectUpdated}
           onProjectDeleted={handleProjectDeleted}
+          initialRun={selectedProject?.currentRun || null}
         />
       )}
 
@@ -470,6 +475,16 @@ const Projects = () => {
         open={pipelineModalOpen}
         onClose={() => {
           setPipelineModalOpen(false);
+          setSelectedRunId(null);
+        }}
+        runId={selectedRunId}
+      />
+
+      {/* Test Run Detail Modal */}
+      <TestRunDetailModal
+        open={runDetailModalOpen}
+        onClose={() => {
+          setRunDetailModalOpen(false);
           setSelectedRunId(null);
         }}
         runId={selectedRunId}

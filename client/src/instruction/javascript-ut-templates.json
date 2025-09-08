@@ -2,180 +2,26 @@
   "language": "JavaScript",
   "testing_framework": "Jest",
   "scope": "Unit Testing",
-  "description": "Mẫu instruction test view point cho JavaScript Unit Testing sử dụng Jest framework",
+  "description": "Mẫu instruction đơn giản cho JavaScript Unit Testing",
   "templates": [
     {
-      "id": "js-ut-function-testing",
-      "name": "Function Testing",
-      "description": "Test các function đơn lẻ với các input/output khác nhau",
-      "viewpoints": [
-        "Input validation testing",
-        "Output validation testing", 
-        "Edge case testing",
-        "Error handling testing",
-        "Boundary value testing"
-      ],
-      "test_patterns": [
-        "Arrange-Act-Assert (AAA)",
-        "Given-When-Then",
-        "Setup-Execute-Verify"
-      ],
-      "examples": [
-        "Test function với null/undefined input",
-        "Test function với empty string/array",
-        "Test function với negative numbers",
-        "Test function với very large numbers",
-        "Test function với special characters"
-      ],
-      "coverage_focus": [
-        "Statement coverage",
-        "Branch coverage", 
-        "Function coverage"
-      ]
+      "id": "js-basic-testing",
+      "name": "Basic Testing",
+      "description": "Test cơ bản cho functions và classes",
+      "instruction": "Tạo unit test cases cho JavaScript code. Focus vào:\n- Test input/output của functions\n- Test edge cases (null, empty, invalid input)\n- Test error handling\n- Test với các giá trị boundary\n\nFormat: Mỗi test case cần có input, expected result, và mô tả ngắn gọn."
     },
     {
-      "id": "js-ut-class-testing",
-      "name": "Class Testing",
-      "description": "Test các class và methods của chúng",
-      "viewpoints": [
-        "Constructor testing",
-        "Method testing",
-        "Property testing",
-        "Inheritance testing",
-        "Encapsulation testing"
-      ],
-      "test_patterns": [
-        "Object instantiation testing",
-        "Method call testing",
-        "State verification testing",
-        "Mock dependency testing"
-      ],
-      "examples": [
-        "Test constructor với valid parameters",
-        "Test constructor với invalid parameters",
-        "Test public methods",
-        "Test private methods (nếu có thể)",
-        "Test method chaining",
-        "Test method với different states"
-      ],
-      "coverage_focus": [
-        "Method coverage",
-        "Line coverage",
-        "Branch coverage trong methods"
-      ]
-    },
-    {
-      "id": "js-ut-async-testing",
+      "id": "js-async-testing", 
       "name": "Async Testing",
-      "description": "Test các async functions, promises và callbacks",
-      "viewpoints": [
-        "Promise testing",
-        "Async/await testing",
-        "Callback testing",
-        "Error handling testing",
-        "Timeout testing"
-      ],
-      "test_patterns": [
-        "Promise resolution testing",
-        "Promise rejection testing",
-        "Async function testing",
-        "Callback execution testing"
-      ],
-      "examples": [
-        "Test Promise.resolve()",
-        "Test Promise.reject()",
-        "Test async function success",
-        "Test async function failure",
-        "Test callback execution",
-        "Test timeout scenarios"
-      ],
-      "coverage_focus": [
-        "Promise state coverage",
-        "Async execution path coverage",
-        "Error path coverage"
-      ]
-    },
-    {
-      "id": "js-ut-dom-testing",
-      "name": "DOM Testing",
-      "description": "Test các DOM manipulation functions",
-      "viewpoints": [
-        "Element creation testing",
-        "Element modification testing",
-        "Event handling testing",
-        "DOM query testing",
-        "DOM traversal testing"
-      ],
-      "test_patterns": [
-        "Mock DOM testing",
-        "Event simulation testing",
-        "DOM state verification",
-        "Cleanup testing"
-      ],
-      "examples": [
-        "Test element creation",
-        "Test element modification",
-        "Test event listeners",
-        "Test DOM queries",
-        "Test DOM cleanup"
-      ],
-      "coverage_focus": [
-        "DOM operation coverage",
-        "Event handling coverage",
-        "Cleanup operation coverage"
-      ]
-    },
-    {
-      "id": "js-ut-utility-testing",
-      "name": "Utility Testing",
-      "description": "Test các utility functions và helpers",
-      "viewpoints": [
-        "Data transformation testing",
-        "Validation testing",
-        "Formatting testing",
-        "Calculation testing",
-        "Helper function testing"
-      ],
-      "test_patterns": [
-        "Pure function testing",
-        "Side effect testing",
-        "Performance testing",
-        "Memory usage testing"
-      ],
-      "examples": [
-        "Test data transformation",
-        "Test validation logic",
-        "Test formatting functions",
-        "Test calculation functions",
-        "Test helper utilities"
-      ],
-      "coverage_focus": [
-        "Function logic coverage",
-        "Input/output coverage",
-        "Edge case coverage"
-      ]
+      "description": "Test cho async functions và promises",
+      "instruction": "Tạo unit test cases cho async JavaScript code. Focus vào:\n- Test Promise resolve/reject\n- Test async/await functions\n- Test error handling trong async code\n- Test timeout scenarios\n\nFormat: Mỗi test case cần có input, expected result, và mô tả ngắn gọn."
     }
   ],
-  "common_testing_principles": [
-    "Test isolation - mỗi test case phải độc lập",
-    "Clear naming - tên test phải mô tả rõ ràng test case",
-    "Single responsibility - mỗi test chỉ test một behavior",
-    "Fast execution - test phải chạy nhanh",
-    "Reliable - test phải ổn định và không flaky"
-  ],
-  "best_practices": [
-    "Sử dụng describe blocks để group related tests",
-    "Sử dụng beforeEach/afterEach cho setup/cleanup",
-    "Mock external dependencies",
-    "Test both positive và negative cases",
-    "Sử dụng meaningful test data",
-    "Avoid test interdependence"
-  ],
-  "testing_tools": [
-    "Jest - testing framework",
-    "Jest DOM - DOM testing utilities",
-    "Jest Mock - mocking utilities",
-    "Coverage reports",
-    "Snapshot testing"
+  "simple_guidelines": [
+    "Tạo 5-8 test cases đơn giản cho mỗi function",
+    "Focus vào input/output validation",
+    "Test cả positive và negative cases",
+    "Sử dụng tên test rõ ràng và mô tả ngắn gọn",
+    "Đảm bảo test cases có thể chạy độc lập"
   ]
 }

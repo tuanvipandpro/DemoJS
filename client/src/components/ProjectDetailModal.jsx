@@ -33,18 +33,20 @@ import {
   Chat as ChatIcon,
   PersonAdd as PersonAddIcon,
   Delete as DeleteIcon,
-  PlayArrow as RunIcon,
   Edit as EditIcon,
   Save as SaveIcon,
   Cancel as CancelIcon,
   Upload as UploadIcon,
-  Description as DocumentIcon
+  Description as DocumentIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { projectsService } from '../services/projects';
 import ConfirmDialog from './ConfirmDialog';
+import TestRunDetailModal from './TestRunDetailModal';
+import PipelineSteps from './PipelineSteps';
 
-const ProjectDetailModal = ({ open, onClose, project, onProjectUpdated, onProjectDeleted }) => {
+const ProjectDetailModal = ({ open, onClose, project, onProjectUpdated, onProjectDeleted, initialRun = null }) => {
   const { user } = useAuth();
   const [members, setMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
@@ -79,19 +81,34 @@ const ProjectDetailModal = ({ open, onClose, project, onProjectUpdated, onProjec
   const [userSearchEmail, setUserSearchEmail] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  
+  // Run test modal state
+  const [selectedRunId, setSelectedRunId] = useState(null);
+  const [runDetailModalOpen, setRunDetailModalOpen] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
-  const [confirmRunOpen, setConfirmRunOpen] = useState(false);
-  const [runningProject, setRunningProject] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
+  
+  // Pipeline and runs state
+  const [runs, setRuns] = useState([]);
+  const [loadingRuns, setLoadingRuns] = useState(false);
+  const [showPipeline, setShowPipeline] = useState(false);
+  const [currentRun, setCurrentRun] = useState(null);
 
   useEffect(() => {
     if (open && project) {
       fetchMembers();
       fetchAvailableUsers();
+      fetchRuns();
       setInstructionText(project.instruction || '');
       loadAvailableLanguages();
+      
+      // Nếu có initialRun, set nó làm currentRun và hiển thị pipeline
+      if (initialRun) {
+        setCurrentRun(initialRun);
+        setShowPipeline(true);
+      }
       
       // Parse existing instruction data if available
       if (project.instruction) {
@@ -140,6 +157,38 @@ const ProjectDetailModal = ({ open, onClose, project, onProjectUpdated, onProjec
     }
   };
 
+  const fetchRuns = async () => {
+    try {
+      setLoadingRuns(true);
+      const response = await projectsService.getProjectRuns(project.id);
+      if (response.success) {
+        const runsList = response.runs || [];
+        setRuns(runsList);
+        
+        // Nếu chưa có currentRun, chọn run mới nhất hoặc đang chạy
+        if (!currentRun && runsList.length > 0) {
+          // Tìm run đang chạy trước
+          const activeRun = runsList.find(run => 
+            ['queued', 'pulling_code', 'generating_tests', 'generating_scripts', 'running_tests', 'generating_report'].includes(run.state)
+          );
+          
+          if (activeRun) {
+            setCurrentRun(activeRun);
+          } else {
+            // Nếu không có run đang chạy, chọn run mới nhất
+            const latestRun = runsList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+            setCurrentRun(latestRun);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching runs:', error);
+      setError(error.message);
+    } finally {
+      setLoadingRuns(false);
+    }
+  };
+
   const handleAddMember = async () => {
     try {
       const response = await projectsService.addProjectMember(project.id, newMember);
@@ -168,28 +217,20 @@ const ProjectDetailModal = ({ open, onClose, project, onProjectUpdated, onProjec
     }
   };
 
-  const handleRunProject = () => {
-    setConfirmRunOpen(true);
-  };
-
-  const handleConfirmRun = async () => {
-    try {
-      setRunningProject(true);
-      // TODO: Implement project run functionality
-
-      // Có thể gọi API để chạy project
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setConfirmRunOpen(false);
-      // TODO: Show success message
-    } catch (error) {
-      console.error('Error running project:', error);
-      // TODO: Show error message
-    } finally {
-      setRunningProject(false);
-    }
+  const handleRunCreated = (newRun) => {
+    // Set current run và hiển thị pipeline ngay lập tức
+    setCurrentRun(newRun);
+    setShowPipeline(true);
+    // Refresh runs để cập nhật danh sách
+    fetchRuns();
+    
+    // Scroll đến pipeline section sau một chút delay
+    setTimeout(() => {
+      const pipelineSection = document.getElementById('pipeline-section');
+      if (pipelineSection) {
+        pipelineSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
   };
 
   const handleDeleteProject = () => {
@@ -535,27 +576,25 @@ const ProjectDetailModal = ({ open, onClose, project, onProjectUpdated, onProjec
                 <Typography variant="body2" color="textSecondary">
                   Repository URL
                 </Typography>
-                <Typography variant="body1">
-                  {project?.repository ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <GitHubIcon />
-                      <Typography 
-                        variant="body1" 
-                        component="a" 
-                        href={project.repository} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        sx={{ textDecoration: 'none', color: 'primary.main' }}
-                      >
-                        {project.repository}
-                      </Typography>
-                    </Box>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      Not connected
+                {project?.repository ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <GitHubIcon />
+                    <Typography 
+                      variant="body1" 
+                      component="a" 
+                      href={project.repository} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      sx={{ textDecoration: 'none', color: 'primary.main' }}
+                    >
+                      {project.repository}
                     </Typography>
-                  )}
-                </Typography>
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Not connected
+                  </Typography>
+                )}
               </Grid>
             </Grid>
           </Box>
@@ -1222,6 +1261,150 @@ const ProjectDetailModal = ({ open, onClose, project, onProjectUpdated, onProjec
                 </Box>
               )}
             </Box>
+
+            {/* Pipeline và Runs Section */}
+            <Box id="pipeline-section" sx={{ mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Typography variant="h6" component="h3">
+                  Pipeline & Test Runs
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      if (!showPipeline) {
+                        // Nếu chưa có currentRun, lấy run mới nhất
+                        if (!currentRun && runs.length > 0) {
+                          setCurrentRun(runs[0]);
+                        }
+                      }
+                      setShowPipeline(!showPipeline);
+                    }}
+                    size="small"
+                    disabled={!currentRun && runs.length === 0}
+                  >
+                    {showPipeline ? 'Hide' : 'View'} Pipeline
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={fetchRuns}
+                    disabled={loadingRuns}
+                    size="small"
+                    startIcon={loadingRuns ? <CircularProgress size={16} /> : <RefreshIcon />}
+                  >
+                    Refresh
+                  </Button>
+                </Box>
+              </Box>
+
+              {/* Current Run Pipeline */}
+              {showPipeline && (
+                <Box sx={{ mb: 3 }}>
+                  {currentRun ? (
+                    <>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Current Run Pipeline - {currentRun.branch || 'main'}
+                      </Typography>
+                      <Box sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 1, bgcolor: 'grey.50' }}>
+                        <PipelineSteps 
+                          currentState={currentRun.state}
+                          errorMessage={currentRun.errorMessage}
+                          isFailed={currentRun.state === 'failed'}
+                          run={currentRun}
+                        />
+                      </Box>
+                    </>
+                  ) : (
+                    <Box sx={{ 
+                      p: 3, 
+                      textAlign: 'center', 
+                      border: '1px dashed #ccc', 
+                      borderRadius: 1,
+                      bgcolor: 'grey.50'
+                    }}>
+                      <Typography variant="body2" color="text.secondary">
+                        No test runs available. Use the "Run" button in the Projects page to start a new test run.
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              )}
+
+              {/* Runs History */}
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>
+                  Test Runs History ({runs.length})
+                </Typography>
+                {loadingRuns ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : runs.length === 0 ? (
+                  <Box sx={{ 
+                    p: 3, 
+                    textAlign: 'center', 
+                    border: '1px dashed #ccc', 
+                    borderRadius: 1,
+                    bgcolor: 'grey.50'
+                  }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No test runs found for this project.
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+                    <List>
+                      {runs.map((run) => (
+                        <ListItem 
+                          key={run.id} 
+                          divider
+                          sx={{ 
+                            cursor: 'pointer',
+                            '&:hover': { bgcolor: 'grey.50' }
+                          }}
+                          onClick={() => {
+                            setCurrentRun(run);
+                            setShowPipeline(true);
+                          }}
+                        >
+                          <ListItemText
+                            primary={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="body1">
+                                  Run #{run.id} - {run.branch || 'main'}
+                                </Typography>
+                                <Chip
+                                  label={run.state.replace('_', ' ').toUpperCase()}
+                                  color={
+                                    run.state === 'completed' ? 'success' :
+                                    run.state === 'failed' ? 'error' :
+                                    ['queued', 'pulling_code', 'generating_tests', 'generating_scripts', 'running_tests', 'generating_report'].includes(run.state) ? 'primary' :
+                                    'default'
+                                  }
+                                  size="small"
+                                />
+                              </Box>
+                            }
+                            secondary={
+                              <Box>
+                                <Typography variant="body2" color="text.secondary">
+                                  Created: {run.createdAt ? new Date(run.createdAt).toLocaleString() : 'Unknown'}
+                                </Typography>
+                                {run.updatedAt && (
+                                  <Typography variant="caption" color="text.secondary">
+                                    Updated: {new Date(run.updatedAt).toLocaleString()}
+                                  </Typography>
+                                )}
+                              </Box>
+                            }
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
+              </Box>
+            </Box>
         </Box>
       </DialogContent>
 
@@ -1229,11 +1412,6 @@ const ProjectDetailModal = ({ open, onClose, project, onProjectUpdated, onProjec
         <Button onClick={onClose}>
           Close
         </Button>
-        {(isOwner || isAdmin) && (
-          <Button variant="outlined" startIcon={<RunIcon />} onClick={handleRunProject}>
-            Run Project
-          </Button>
-        )}
         {isOwner && (
           <Button 
             variant="contained" 
@@ -1246,18 +1424,6 @@ const ProjectDetailModal = ({ open, onClose, project, onProjectUpdated, onProjec
         )}
       </DialogActions>
 
-      {/* Confirm Run Dialog */}
-      <ConfirmDialog
-        open={confirmRunOpen}
-        onClose={() => setConfirmRunOpen(false)}
-        onConfirm={handleConfirmRun}
-        title="Xác nhận chạy Project"
-        message={`Bạn có chắc chắn muốn chạy project "${project?.name}"? Hành động này sẽ bắt đầu quá trình test automation.`}
-        confirmText="Chạy Project"
-        cancelText="Hủy"
-        severity="warning"
-        loading={runningProject}
-      />
 
       {/* Confirm Delete Dialog */}
       <ConfirmDialog
@@ -1270,6 +1436,14 @@ const ProjectDetailModal = ({ open, onClose, project, onProjectUpdated, onProjec
         cancelText="Hủy"
         severity="error"
         loading={deletingProject}
+      />
+
+
+      {/* Test Run Detail Modal */}
+      <TestRunDetailModal
+        open={runDetailModalOpen}
+        onClose={() => setRunDetailModalOpen(false)}
+        runId={selectedRunId}
       />
     </Dialog>
   );

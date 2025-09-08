@@ -178,5 +178,17 @@ export const projectsService = {
       console.error('Error updating project status:', error);
       throw error;
     }
+  },
+
+  // Lấy danh sách runs của project
+  getProjectRuns: async (projectId) => {
+    try {
+      // Sử dụng runsService.getRuns() với projectId filter thay vì API không tồn tại
+      const { runsService } = await import('./runs.js');
+      return await runsService.getRuns({ projectId });
+    } catch (error) {
+      console.error('Error fetching project runs:', error);
+      throw error;
+    }
   }
 };

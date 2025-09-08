@@ -40,10 +40,13 @@ const TestRunCard = ({ run, onRunUpdate, onViewDetails }) => {
   const getStatusColor = (status) => {
     const statusColors = {
       queued: 'default',
-      planning: 'info',
-      proposals: 'warning',
-      approved: 'primary',
-      executing: 'secondary',
+      pulling_code: 'info',
+      generating_tests: 'info',
+      test_approval: 'warning',
+      generating_scripts: 'info',
+      running_tests: 'secondary',
+      generating_report: 'info',
+      report_approval: 'warning',
       completed: 'success',
       failed: 'error'
     };
@@ -53,14 +56,33 @@ const TestRunCard = ({ run, onRunUpdate, onViewDetails }) => {
   const getStatusIcon = (status) => {
     const statusIcons = {
       queued: <ScheduleIcon />,
-      planning: <PlayIcon />,
-      proposals: <ApprovalIcon />,
-      approved: <CheckIcon />,
-      executing: <PlayIcon />,
+      pulling_code: <PlayIcon />,
+      generating_tests: <PlayIcon />,
+      test_approval: <ApprovalIcon />,
+      generating_scripts: <PlayIcon />,
+      running_tests: <PlayIcon />,
+      generating_report: <AssessmentIcon />,
+      report_approval: <ApprovalIcon />,
       completed: <CheckIcon />,
       failed: <ErrorIcon />
     };
     return statusIcons[status] || <ScheduleIcon />;
+  };
+
+  const getStatusLabel = (status) => {
+    const statusLabels = {
+      queued: 'Queued',
+      pulling_code: 'Pulling Code',
+      generating_tests: 'Generating Tests',
+      test_approval: 'Test Approval',
+      generating_scripts: 'Generating Scripts',
+      running_tests: 'Running Tests',
+      generating_report: 'Generating Report',
+      report_approval: 'Report Approval',
+      completed: 'Completed',
+      failed: 'Failed'
+    };
+    return statusLabels[status] || status;
   };
 
   const formatDate = (dateString) => {
@@ -83,18 +105,33 @@ const TestRunCard = ({ run, onRunUpdate, onViewDetails }) => {
     }
   };
 
-  const handleApproveProposals = async () => {
+  const handleApproveTestCases = async () => {
     setActionLoading(true);
     try {
-      // For now, approve all proposals
-      const approvedProposals = run.proposals || [];
-      const response = await runsService.approveProposals(run.id, approvedProposals);
+      // For now, approve all test cases
+      const approvedTestCases = run.proposals || [];
+      const response = await runsService.approveTestCases(run.id, approvedTestCases);
       
       if (response.success) {
         onRunUpdate && onRunUpdate();
       }
     } catch (error) {
-      console.error('Error approving proposals:', error);
+      console.error('Error approving test cases:', error);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleApproveReport = async () => {
+    setActionLoading(true);
+    try {
+      const response = await runsService.approveReport(run.id);
+      
+      if (response.success) {
+        onRunUpdate && onRunUpdate();
+      }
+    } catch (error) {
+      console.error('Error approving report:', error);
     } finally {
       setActionLoading(false);
     }
@@ -143,11 +180,14 @@ const TestRunCard = ({ run, onRunUpdate, onViewDetails }) => {
 
   const getProgressValue = () => {
     const statusProgress = {
-      queued: 10,
-      planning: 25,
-      proposals: 50,
-      approved: 75,
-      executing: 90,
+      queued: 5,
+      pulling_code: 15,
+      generating_tests: 30,
+      test_approval: 40,
+      generating_scripts: 55,
+      running_tests: 75,
+      generating_report: 85,
+      report_approval: 90,
       completed: 100,
       failed: 0
     };
@@ -176,7 +216,7 @@ const TestRunCard = ({ run, onRunUpdate, onViewDetails }) => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Chip
               icon={getStatusIcon(run.state)}
-              label={run.state.toUpperCase()}
+              label={getStatusLabel(run.state)}
               color={getStatusColor(run.state)}
               variant="outlined"
             />
@@ -368,62 +408,43 @@ const TestRunCard = ({ run, onRunUpdate, onViewDetails }) => {
         </Box>
         
         <Box sx={{ display: 'flex', gap: 1 }}>
-          {run.state === 'proposals' && (
+          {run.state === 'test_approval' && (
             <Button
               variant="contained"
               color="primary"
               startIcon={<ApprovalIcon />}
-              onClick={handleApproveProposals}
+              onClick={handleApproveTestCases}
               disabled={actionLoading}
               size="small"
             >
-              Approve Proposals
+              Approve Test Cases
             </Button>
           )}
           
-          {run.state === 'approved' && (
+          {run.state === 'report_approval' && (
             <Button
               variant="contained"
-              color="secondary"
-              startIcon={<PlayIcon />}
-              onClick={handleExecuteTests}
+              color="success"
+              startIcon={<CheckIcon />}
+              onClick={handleApproveReport}
               disabled={actionLoading}
               size="small"
             >
-              Execute Tests
+              Approve Report
             </Button>
           )}
           
-          {run.state === 'completed' && !run.decision && (
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                variant="outlined"
-                color="success"
-                onClick={() => handleRecordDecision('commit')}
-                disabled={actionLoading}
-                size="small"
-              >
-                Commit
-              </Button>
-              <Button
-                variant="outlined"
-                color="info"
-                onClick={() => handleRecordDecision('pr')}
-                disabled={actionLoading}
-                size="small"
-              >
-                Create PR
-              </Button>
-              <Button
-                variant="outlined"
-                color="default"
-                onClick={() => handleRecordDecision('none')}
-                disabled={actionLoading}
-                size="small"
-              >
-                None
-              </Button>
-            </Box>
+          {run.state === 'completed' && run.mrUrl && (
+            <Button
+              variant="outlined"
+              color="info"
+              href={run.mrUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              size="small"
+            >
+              View MR
+            </Button>
           )}
         </Box>
       </CardActions>

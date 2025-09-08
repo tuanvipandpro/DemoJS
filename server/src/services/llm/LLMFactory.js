@@ -1,4 +1,4 @@
-import { MockLLMService } from './MockLLMService.js';
+import { LangChainService } from './langchainService.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -6,35 +6,30 @@ import { logger } from '../../utils/logger.js';
  * Cho phép dễ dàng thay đổi AI provider dựa trên configuration
  */
 export class LLMFactory {
-  static createLLMService(type = 'mock') {
+  static createLLMService(type = 'gemini') {
     switch (type.toLowerCase()) {
-      case 'mock':
-        logger.info('Creating Mock LLM Service');
-        return new MockLLMService();
+      case 'gemini':
+        logger.info('Creating LangChain Gemini Service');
+        return new LangChainService();
       
       case 'openai':
         // TODO: Implement OpenAI LLM Service
-        logger.warn('OpenAI LLM Service not implemented yet, falling back to Mock');
-        return new MockLLMService();
+        logger.warn('OpenAI LLM Service not implemented yet, falling back to Gemini');
+        return new LangChainService();
       
       case 'bedrock':
         // TODO: Implement AWS Bedrock LLM Service
-        logger.warn('AWS Bedrock LLM Service not implemented yet, falling back to Mock');
-        return new MockLLMService();
-      
-      case 'gemini':
-        // TODO: Implement Google Gemini LLM Service
-        logger.warn('Google Gemini LLM Service not implemented yet, falling back to Mock');
-        return new MockLLMService();
+        logger.warn('AWS Bedrock LLM Service not implemented yet, falling back to Gemini');
+        return new LangChainService();
       
       case 'lmstudio':
         // TODO: Implement LM Studio LLM Service
-        logger.warn('LM Studio LLM Service not implemented yet, falling back to Mock');
-        return new MockLLMService();
+        logger.warn('LM Studio LLM Service not implemented yet, falling back to Gemini');
+        return new LangChainService();
       
       default:
-        logger.warn(`Unknown LLM service type: ${type}, falling back to Mock`);
-        return new MockLLMService();
+        logger.warn(`Unknown LLM service type: ${type}, falling back to Gemini`);
+        return new LangChainService();
     }
   }
 
@@ -42,7 +37,7 @@ export class LLMFactory {
    * Tạo LLM service dựa trên environment variables
    */
   static createDefaultLLMService() {
-    const llmType = process.env.LLM_SERVICE_TYPE || 'mock';
+    const llmType = process.env.LLM_SERVICE_TYPE || 'gemini';
     return this.createLLMService(llmType);
   }
 
@@ -65,7 +60,7 @@ export class LLMFactory {
    * Tạo LLM service dựa trên project configuration
    */
   static createLLMServiceForProject(projectConfig) {
-    const llmType = projectConfig.llmProvider || process.env.LLM_SERVICE_TYPE || 'mock';
+    const llmType = projectConfig.llmProvider || process.env.LLM_SERVICE_TYPE || 'gemini';
     const config = {
       ...projectConfig.llmConfig,
       projectId: projectConfig.id,
