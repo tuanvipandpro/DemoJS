@@ -1148,6 +1148,12 @@ async function processRunAsync(runId, project, branch) {
               cleanedResponse = cleanedResponse.slice(3, -3).trim();
             }
             
+            // Clean undefined values from JSON string
+            cleanedResponse = cleanedResponse.replace(/:\s*undefined/g, ': null');
+            cleanedResponse = cleanedResponse.replace(/,\s*undefined/g, ', null');
+            cleanedResponse = cleanedResponse.replace(/undefined\s*:/g, 'null:');
+            cleanedResponse = cleanedResponse.replace(/undefined\s*,/g, 'null,');
+            
             fileTestCases = JSON.parse(cleanedResponse);
             if (!Array.isArray(fileTestCases)) {
               throw new Error('Response is not an array');
@@ -1759,20 +1765,21 @@ async function runTestScriptsFromCode(testScriptCode, run) {
   try {
     const projectName = run.project_name || run.domain || `project_${run.project_id}`;
     const projectDir = path.join(process.cwd(), 'temp', 'test', projectName);
+    const srcDir = path.join(projectDir, 'newSrc');
     
     // Check if package.json exists
-    const packageJsonPath = path.join(projectDir, 'package.json');
+    const packageJsonPath = path.join(srcDir, 'package.json');
     const hasPackageJson = await fs.access(packageJsonPath).then(() => true).catch(() => false);
     
     if (hasPackageJson) {
       // Run npm install first
       const { exec } = await import('child_process');
       const util = await import('util');
-      const execAsync = util.promisify(exec.exec);
+      const execAsync = util.promisify(exec);
       
       try {
-        logger.info(`Running npm install in ${projectDir}`);
-        await execAsync('npm install', { cwd: projectDir });
+        logger.info(`Running npm install in ${srcDir}`);
+        await execAsync('npm install', { cwd: srcDir });
         logger.info('npm install completed successfully');
       } catch (error) {
         logger.warn('npm install failed, continuing with test execution:', error.message);
@@ -1780,8 +1787,8 @@ async function runTestScriptsFromCode(testScriptCode, run) {
       
       // Run tests using npm test
       try {
-        logger.info(`Running npm test in ${projectDir}`);
-        const { stdout, stderr } = await execAsync('npm test', { cwd: projectDir });
+        logger.info(`Running npm test in ${srcDir}`);
+        const { stdout, stderr } = await execAsync('npm test', { cwd: srcDir });
         
         // Parse test results from Jest output
         const testResults = parseJestOutput(stdout, stderr);
@@ -3319,7 +3326,7 @@ async function pullCodeFromBranch(run, branchName) {
   try {
     const projectName = run.project_name || run.domain || `project_${run.project_id}`;
     const projectDir = path.join(process.cwd(), 'temp', 'test', projectName);
-    const srcDir = path.join(projectDir, 'src');
+    const srcDir = path.join(projectDir, 'newSrc');
     
     // Check if directory exists
     try {
@@ -3331,7 +3338,7 @@ async function pullCodeFromBranch(run, branchName) {
     // Clone or pull the repository
     const { exec } = await import('child_process');
     const util = await import('util');
-    const execAsync = util.promisify(exec.exec);
+    const execAsync = util.promisify(exec);
     
     try {
       // Check if directory is already a git repository
@@ -3365,9 +3372,9 @@ async function createTestScriptFiles(runId, testScripts, run) {
   try {
     const projectName = run.project_name || run.domain || `project_${run.project_id}`;
     const testDir = path.join(process.cwd(), 'temp', 'test', projectName);
-    const utcDir = path.join(testDir, 'utc');
+    const utsDir = path.join(testDir, 'uts');
     
-    await fs.mkdir(utcDir, { recursive: true });
+    await fs.mkdir(utsDir, { recursive: true });
     
     // Create test script files
     for (let i = 0; i < testScripts.length; i++) {
