@@ -285,39 +285,42 @@ router.get('/summary', async (req, res) => {
       success: true,
       range,
       summary: {
-        totalRuns: parseInt(summary.total_runs) || 0,
-        successfulRuns: parseInt(summary.successful_runs) || 0,
-        failedRuns: parseInt(summary.failed_runs) || 0,
-        runningRuns: parseInt(summary.running_runs) || 0,
-        queuedRuns: parseInt(summary.queued_runs) || 0,
-        planningRuns: parseInt(summary.planning_runs) || 0,
-        proposalsRuns: parseInt(summary.proposals_runs) || 0,
-        avgDurationSeconds: parseFloat(summary.avg_duration_seconds) || 0,
-        activeProjects: parseInt(summary.active_projects) || 0,
-        avgConfidenceScore: parseFloat(summary.avg_confidence_score) || 0
+        total_runs: parseInt(summary.total_runs) || 0,
+        successful_runs: parseInt(summary.successful_runs) || 0,
+        failed_runs: parseInt(summary.failed_runs) || 0,
+        running_runs: parseInt(summary.running_runs) || 0,
+        queued_runs: parseInt(summary.queued_runs) || 0,
+        planning_runs: parseInt(summary.planning_runs) || 0,
+        proposals_runs: parseInt(summary.proposals_runs) || 0,
+        avg_duration_minutes: Math.round((parseFloat(summary.avg_duration_seconds) || 0) / 60),
+        active_projects: parseInt(summary.active_projects) || 0,
+        avg_confidence_score: parseFloat(summary.avg_confidence_score) || 0,
+        success_rate: summary.total_runs > 0 
+          ? Math.round((parseInt(summary.successful_runs) / parseInt(summary.total_runs)) * 100)
+          : 0
       },
-      dailyRuns: dailyRunsResult.rows.map(row => ({
+      daily_runs: dailyRunsResult.rows.map(row => ({
         date: row.date,
-        totalRuns: parseInt(row.total_runs) || 0,
-        successfulRuns: parseInt(row.successful_runs) || 0,
-        failedRuns: parseInt(row.failed_runs) || 0
+        total_runs: parseInt(row.total_runs) || 0,
+        successful_runs: parseInt(row.successful_runs) || 0,
+        failed_runs: parseInt(row.failed_runs) || 0
       })),
-      projectPerformance: projectPerformanceResult.rows.map(row => ({
-        projectName: row.project_name,
-        totalRuns: parseInt(row.total_runs) || 0,
-        successfulRuns: parseInt(row.successful_runs) || 0,
-        failedRuns: parseInt(row.failed_runs) || 0,
-        successRate: parseFloat(row.success_rate) || 0,
-        avgConfidence: parseFloat(row.avg_confidence) || 0
+      project_performance: projectPerformanceResult.rows.map(row => ({
+        project_name: row.project_name,
+        total_runs: parseInt(row.total_runs) || 0,
+        successful_runs: parseInt(row.successful_runs) || 0,
+        failed_runs: parseInt(row.failed_runs) || 0,
+        success_rate: parseFloat(row.success_rate) || 0,
+        avg_confidence: parseFloat(row.avg_confidence) || 0
       })),
-      recentActivity: recentActivityResult.rows.map(row => ({
+      recent_activity: recentActivityResult.rows.map(row => ({
         id: row.id,
         state: row.state,
-        createdAt: row.created_at,
-        finishedAt: row.finished_at,
-        projectName: row.project_name,
-        durationSeconds: parseFloat(row.duration_seconds) || null,
-        confidenceScore: parseFloat(row.confidence_score) || null
+        created_at: row.created_at,
+        finished_at: row.finished_at,
+        project_name: row.project_name,
+        duration_minutes: Math.round((parseFloat(row.duration_seconds) || 0) / 60),
+        confidence_score: parseFloat(row.confidence_score) || null
       })),
       decisionStats: decisionStatsResult.rows.map(row => ({
         decision: row.decision,

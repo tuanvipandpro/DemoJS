@@ -8,6 +8,14 @@ import aiService from '../services/llm/aiService.js';
 import langchainService from '../services/llm/langchainService.js';
 import s3Service from '../services/s3Service.js';
 import { decryptToken } from '../utils/tokenEncryption.js';
+import { 
+  STEP_NAMES, 
+  STEP_STATUS, 
+  STEP_ORDER, 
+  ALL_STEPS,
+  getStepByName,
+  getStepByOrder 
+} from '../constants/pipelineSteps.js';
 import axios from 'axios';
 import fs from 'fs/promises';
 import path from 'path';
@@ -1072,19 +1080,16 @@ async function getStepHistory(runId) {
   }
 }
 
-async function initializeRunSteps(runId) {
+export async function initializeRunSteps(runId) {
   try {
-    // Insert all predefined steps for a run
+    // Insert all predefined steps for a run using constants
+    const stepValues = ALL_STEPS.map(step => 
+      `($1, '${step.name}', ${step.order}, '${STEP_STATUS.PENDING}')`
+    ).join(',\n      ');
+    
     await pool.query(`
       INSERT INTO run_step (run_id, step_name, step_order, status) VALUES
-      ($1, 'queued', 1, 'pending'),
-      ($1, 'pull_code_generate_test', 2, 'pending'),
-      ($1, 'test_approval', 3, 'pending'),
-      ($1, 'generate_scripts', 4, 'pending'),
-      ($1, 'run_test', 5, 'pending'),
-      ($1, 'generate_report', 6, 'pending'),
-      ($1, 'report_approval', 7, 'pending'),
-      ($1, 'completed', 8, 'pending')
+      ${stepValues}
     `, [runId]);
     
     logger.info(`Initialized run steps for run ${runId}`);
@@ -1101,8 +1106,24 @@ async function processRunAsync(runId, project, branch) {
   try {
     logger.info(`Processing run ${runId} for project ${project.id}, branch: ${branch}`);
     
+    // Start clean_workspace step
+    await startStep(runId, STEP_NAMES.CLEAN_WORKSPACE, { branch });
+    
+    // Step 1: Clean workspace
+    await pool.query(`
+      UPDATE runs SET state = 'cleaning_workspace', updated_at = CURRENT_TIMESTAMP WHERE id = $1
+    `, [runId]);
+    
+    await addLog(runId, `Clearing workspace for project: ${project.name || project.domain}`, 'info');
+    
+    // Clear workspace before pulling new code
+    await clearWorkspace(runId, project);
+    
+    // Complete clean_workspace step
+    await completeStep(runId, STEP_NAMES.CLEAN_WORKSPACE);
+    
     // Start pull_code_generate_test step
-    await startStep(runId, 'pull_code_generate_test', { branch });
+    await startStep(runId, STEP_NAMES.PULL_CODE_GENERATE_TESTS, { branch });
     
     // Step 1: Pull source code and generate test cases (combined step)
     await pool.query(`
@@ -1110,9 +1131,6 @@ async function processRunAsync(runId, project, branch) {
     `, [runId]);
     
     await addLog(runId, `Pulling latest code from branch: ${branch}`, 'info');
-    
-    // Clear workspace before pulling new code
-    await clearWorkspace(runId, project);
     
     const codeContent = await fetchCodeFromBranch(project, branch);
     await addLog(runId, `Successfully pulled code (${codeContent.length} characters)`, 'info');
@@ -1126,56 +1144,60 @@ async function processRunAsync(runId, project, branch) {
       // Parse codeContent to extract individual files
       const files = parseCodeContent(codeContent);
       logger.info(`Parsed ${files.length} files from code content`);
-      let allTestCases = [];
       
+      // Filter files that need test generation
+      const filesForTesting = files.filter(file => 
+        file.content && file.path && shouldIncludeFile(file.path)
+      );
+      logger.info(`Filtered ${filesForTesting.length} files for test generation from ${files.length} total files`);
+      
+      let allTestCases = [];
       let processedFiles = 0;
-      for (const file of files) {
-        if (file.content && file.path) {
-          logger.info(`Generating test cases for file: ${file.path}`);
-          const fileTestCasesResponse = await generateTestCasesWithAI(file.content, project.instruction, file.path);
-          
-          // Write AI response to logs folder
-          await writeAIResponseToFile(runId, project, fileTestCasesResponse, `test_cases_${file.path.replace(/[^a-zA-Z0-9.-]/g, '_')}`);
-          
-          // Parse JSON response to array
-          let fileTestCases = [];
-          try {
-            // Clean markdown wrapper if present
-            let cleanedResponse = fileTestCasesResponse.trim();
-            if (cleanedResponse.startsWith('```json') && cleanedResponse.endsWith('```')) {
-              cleanedResponse = cleanedResponse.slice(7, -3).trim();
-            } else if (cleanedResponse.startsWith('```') && cleanedResponse.endsWith('```')) {
-              cleanedResponse = cleanedResponse.slice(3, -3).trim();
-            }
-            
-            // Clean undefined values from JSON string
-            cleanedResponse = cleanedResponse.replace(/:\s*undefined/g, ': null');
-            cleanedResponse = cleanedResponse.replace(/,\s*undefined/g, ', null');
-            cleanedResponse = cleanedResponse.replace(/undefined\s*:/g, 'null:');
-            cleanedResponse = cleanedResponse.replace(/undefined\s*,/g, 'null,');
-            
-            fileTestCases = JSON.parse(cleanedResponse);
-            if (!Array.isArray(fileTestCases)) {
-              throw new Error('Response is not an array');
-            }
-          } catch (parseError) {
-            logger.error(`Failed to parse test cases for file ${file.path}:`, parseError);
-            logger.error('Raw response:', fileTestCasesResponse);
-            continue; // Skip this file
+      for (const file of filesForTesting) {
+        logger.info(`Generating test cases for file: ${file.path}`);
+        const fileTestCasesResponse = await generateTestCasesWithAI(file.content, project.instruction, file.path);
+        
+        // Write AI response to logs folder
+        await writeAIResponseToFile(runId, project, fileTestCasesResponse, `test_cases_${file.path.replace(/[^a-zA-Z0-9.-]/g, '_')}`);
+        
+        // Parse JSON response to array
+        let fileTestCases = [];
+        try {
+          // Clean markdown wrapper if present
+          let cleanedResponse = fileTestCasesResponse.trim();
+          if (cleanedResponse.startsWith('```json') && cleanedResponse.endsWith('```')) {
+            cleanedResponse = cleanedResponse.slice(7, -3).trim();
+          } else if (cleanedResponse.startsWith('```') && cleanedResponse.endsWith('```')) {
+            cleanedResponse = cleanedResponse.slice(3, -3).trim();
           }
           
-          logger.info(`Generated ${fileTestCases.length} test cases for file: ${file.path}`);
-          processedFiles++;
-          if (fileTestCases.length > 0) {
-            // Add file path to each test case
-            fileTestCases.forEach(tc => {
-              tc.filePath = file.path;
-            });
-            allTestCases = allTestCases.concat(fileTestCases);
-            
-            // Save test cases for this file to utc folder
-            await saveTestCaseFile(runId, project, file.path, fileTestCases);
+          // Clean undefined values from JSON string
+          cleanedResponse = cleanedResponse.replace(/:\s*undefined/g, ': null');
+          cleanedResponse = cleanedResponse.replace(/,\s*undefined/g, ', null');
+          cleanedResponse = cleanedResponse.replace(/undefined\s*:/g, 'null:');
+          cleanedResponse = cleanedResponse.replace(/undefined\s*,/g, 'null,');
+          
+          fileTestCases = JSON.parse(cleanedResponse);
+          if (!Array.isArray(fileTestCases)) {
+            throw new Error('Response is not an array');
           }
+        } catch (parseError) {
+          logger.error(`Failed to parse test cases for file ${file.path}:`, parseError);
+          logger.error('Raw response:', fileTestCasesResponse);
+          continue; // Skip this file
+        }
+        
+        logger.info(`Generated ${fileTestCases.length} test cases for file: ${file.path}`);
+        processedFiles++;
+        if (fileTestCases.length > 0) {
+          // Add file path to each test case
+          fileTestCases.forEach(tc => {
+            tc.filePath = file.path;
+          });
+          allTestCases = allTestCases.concat(fileTestCases);
+          
+          // Save test cases for this file to utc folder
+          await saveTestCaseFile(runId, project, file.path, fileTestCases);
         }
       }
       
@@ -1232,13 +1254,15 @@ async function processRunAsync(runId, project, branch) {
         throw error;
       }
       
-      await addLog(runId, 'Test cases generated successfully, waiting for approval', 'info');
+      await addLog(runId, `Test cases generated successfully for ${processedFiles} files, waiting for approval`, 'info');
       
       // Complete pull_code_generate_test step successfully
-      logger.info(`Completing pull_code_generate_test step with ${allTestCases.length} test cases`);
-      await completeStep(runId, 'pull_code_generate_test', 'completed', null, { 
+      logger.info(`Completing pull_code_generate_test step with ${allTestCases.length} test cases from ${processedFiles} files`);
+      await completeStep(runId, STEP_NAMES.PULL_CODE_GENERATE_TESTS, STEP_STATUS.COMPLETED, null, { 
         testCasesCount: allTestCases.length,
-        filesProcessed: processedFiles 
+        filesProcessed: processedFiles,
+        totalFiles: files.length,
+        filesForTesting: filesForTesting.length
       });
       logger.info(`Successfully completed pull_code_generate_test step`);
       
@@ -1249,7 +1273,7 @@ async function processRunAsync(runId, project, branch) {
       await addLog(runId, `Error generating test cases: ${error.message}`, 'error');
       
       // Complete pull_code_generate_test step with error
-      await completeStep(runId, 'pull_code_generate_test', 'failed', error.message);
+      await completeStep(runId, STEP_NAMES.PULL_CODE_GENERATE_TESTS, STEP_STATUS.FAILED, error.message);
       
       // Update run state to failed
       await pool.query(`
@@ -1293,6 +1317,9 @@ async function executeTestsAsync(runId) {
     
     const run = runResult.rows[0];
     
+    // Start generate_execute_scripts step
+    await startStep(runId, STEP_NAMES.GENERATE_EXECUTE_SCRIPTS);
+    
     // Step 1: Generate test scripts based on approved test cases
     await pool.query(`
       UPDATE runs SET state = 'generating_scripts', updated_at = CURRENT_TIMESTAMP WHERE id = $1
@@ -1322,74 +1349,42 @@ async function executeTestsAsync(runId) {
       
       await addLog(runId, 'Test scripts generated successfully', 'info');
       
-      // Complete generate_scripts step
-      await completeStep(runId, 'generate_scripts', 'completed', null, { 
-        testScriptCodeLength: testScriptCode.length 
-      });
-      
-      // Step 1.5: Create MR with test scripts
-      await startStep(runId, 'create_mr', { testScriptCodeLength: testScriptCode.length });
+      // Step 2: Run tests after creating test scripts
+      await addLog(runId, 'Running tests after creating test scripts', 'info');
       
       try {
-        // Get test scripts from the generated files in uts folder
-        const testScripts = await getTestScriptsFromFolder(run);
-        const mrResult = await createMergeRequest(run, testScripts);
+        // Run tests
+        const testResults = await runTestScriptsFromCode(testScriptCode, run);
+        await addLog(runId, `Test execution completed: ${testResults.passed}/${testResults.total} passed`, 'info');
         
-        await addLog(runId, `Created MR: ${mrResult.url}`, 'info');
-        
-        // Complete create_mr step
-        await completeStep(runId, 'create_mr', 'completed', null, { 
-          mrUrl: mrResult.url,
-          mrNumber: mrResult.number 
+        // Complete generate_execute_scripts step with test results
+        await completeStep(runId, STEP_NAMES.GENERATE_EXECUTE_SCRIPTS, STEP_STATUS.COMPLETED, null, { 
+          testScriptCodeLength: testScriptCode.length,
+          testResults: testResults
         });
         
-        // Step 1.6: Pull code from new branch
-        await startStep(runId, 'pull_new_branch', { 
-          mrUrl: mrResult.url,
-          mrNumber: mrResult.number 
-        });
+        // Update run state to coverage_approval (next step)
+        await pool.query(`
+          UPDATE runs 
+          SET state = 'coverage_approval', updated_at = CURRENT_TIMESTAMP 
+          WHERE id = $1
+        `, [runId]);
         
-        try {
-          // Pull code from the new branch
-          await pullCodeFromBranch(run, mrResult.branch);
-          await addLog(runId, `Pulled code from branch: ${mrResult.branch}`, 'info');
-          
-          // Complete pull_new_branch step
-          await completeStep(runId, 'pull_new_branch', 'completed', null, { 
-            branch: mrResult.branch 
-          });
-        } catch (error) {
-          logger.error('Error pulling code from new branch:', error);
-          await addLog(runId, `Error pulling code from new branch: ${error.message}`, 'error');
-          
-          // Complete pull_new_branch step with error
-          await completeStep(runId, 'pull_new_branch', 'failed', error.message);
-          
-          // Update run state to failed
-          await pool.query(`
-            UPDATE runs 
-            SET state = 'failed', error_message = $1, updated_at = CURRENT_TIMESTAMP 
-            WHERE id = $2
-          `, [error.message, runId]);
-          
-          return;
-        }
+        await addLog(runId, 'Test execution completed, waiting for coverage approval', 'info');
         
-      } catch (error) {
-        logger.error('Error creating MR:', error);
-        await addLog(runId, `Error creating MR: ${error.message}`, 'error');
+      } catch (testError) {
+        logger.error('Error running tests:', testError);
+        await addLog(runId, `Error running tests: ${testError.message}`, 'error');
         
-        // Complete create_mr step with error
-        await completeStep(runId, 'create_mr', 'failed', error.message);
+        // Complete generate_execute_scripts step with error
+        await completeStep(runId, STEP_NAMES.GENERATE_EXECUTE_SCRIPTS, STEP_STATUS.FAILED, testError.message);
         
         // Update run state to failed
         await pool.query(`
           UPDATE runs 
           SET state = 'failed', error_message = $1, updated_at = CURRENT_TIMESTAMP 
-          WHERE id = $2
-        `, [error.message, runId]);
-        
-        return;
+          WHERE id = $1
+        `, [runId, testError.message]);
       }
       
     } catch (error) {
@@ -1397,7 +1392,7 @@ async function executeTestsAsync(runId) {
       await addLog(runId, `Error generating test scripts: ${error.message}`, 'error');
       
       // Complete generate_scripts step with error
-      await completeStep(runId, 'generate_scripts', 'failed', error.message);
+      await completeStep(runId, STEP_NAMES.GENERATE_EXECUTE_SCRIPTS, STEP_STATUS.FAILED, error.message);
       
       // Update run state to failed
       await pool.query(`
@@ -1422,7 +1417,7 @@ async function executeTestsAsync(runId) {
     await addLog(runId, `Test execution completed: ${testResults.passed}/${testResults.total} passed`, 'info');
     
     // Complete run_test step
-    await completeStep(runId, 'run_test', 'completed', null, { 
+    await completeStep(runId, 'run_test', STEP_STATUS.COMPLETED, null, { 
       passed: testResults.passed,
       total: testResults.total,
       coverage: testResults.coverage 
@@ -1450,7 +1445,7 @@ async function executeTestsAsync(runId) {
     `, [runId, 'summary', reportData, 'pending']);
     
     // Complete generate_report step
-    await completeStep(runId, 'generate_report', 'completed', null, { 
+    await completeStep(runId, 'generate_report', STEP_STATUS.COMPLETED, null, { 
       reportGenerated: true 
     });
     
@@ -1553,15 +1548,13 @@ async function fetchCodeFromBranch(project, branch) {
     // Fetch toàn bộ source code recursively
     const allFiles = await fetchAllFilesRecursively(owner, repoName, branch, decryptedToken);
     
-    // Lấy nội dung của tất cả files với chunking
+    // Lấy nội dung của tất cả files (không giới hạn cho việc pull code)
     let codeContent = '';
-    const maxFileSize = 500000; // 500KB per file
-    const maxTotalSize = 5000000; // 5000KB total (tăng lên)
+    const maxFileSize = 1000000; // 1MB per file (tăng lên)
     let fileCount = 0;
-    const maxFiles = 100; // Tăng số file tối đa
     
     for (const file of allFiles) {
-      if (file.type === 'file' && shouldIncludeFile(file.name) && fileCount < maxFiles) {
+      if (file.type === 'file' && shouldIncludeFileForPull(file.name)) {
         try {
           const fileResponse = await axios.get(file.download_url);
           let fileContent = fileResponse.data;
@@ -1569,12 +1562,6 @@ async function fetchCodeFromBranch(project, branch) {
           // Nếu file quá lớn, chỉ lấy phần đầu
           if (fileContent.length > maxFileSize) {
             fileContent = fileContent.substring(0, maxFileSize) + '\n// ... (file truncated due to size)';
-          }
-          
-          // Kiểm tra tổng kích thước
-          if (codeContent.length + fileContent.length > maxTotalSize) {
-            codeContent += `\n// ... (additional files truncated due to total size limit)`;
-            break;
           }
           
           codeContent += `\n// File: ${file.path}\n${fileContent}\n`;
@@ -1637,9 +1624,22 @@ function shouldSkipDirectory(dirName) {
   return skipDirs.includes(dirName) || dirName.startsWith('.');
 }
 
+// Function to check if file should be included when pulling code (more permissive)
+function shouldIncludeFileForPull(filename) {
+  const includeExtensions = ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.go', '.rs', '.cpp', '.c', '.h', '.json', '.md', '.txt', '.yml', '.yaml', '.xml', '.sql', '.sh', '.bat'];
+  const excludePatterns = ['node_modules', '.git', 'dist', 'build', 'coverage', '.nyc_output', 'logs', 'tmp', 'temp', '.vscode', '.idea', 'target', 'out', 'bin', 'obj', '.next', 'venv', '__pycache__', '.pytest_cache', '.mypy_cache'];
+  
+  const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+  const hasValidExtension = includeExtensions.includes(ext);
+  const isExcluded = excludePatterns.some(pattern => filename.includes(pattern));
+  
+  return hasValidExtension && !isExcluded;
+}
+
+// Function to check if file should be included for test generation (more restrictive)
 function shouldIncludeFile(filename) {
   const includeExtensions = ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.go', '.rs', '.cpp', '.c', '.h'];
-  const excludePatterns = ['node_modules', '.git', 'dist', 'build', 'coverage', 'test', '__tests__'];
+  const excludePatterns = ['node_modules', '.git', 'dist', 'build', 'coverage', 'test', '__tests__', '.spec.', '.test.', '.spec.js', '.test.js', '.spec.ts', '.test.ts'];
   
   const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
   const hasValidExtension = includeExtensions.includes(ext);
@@ -1765,7 +1765,7 @@ async function runTestScriptsFromCode(testScriptCode, run) {
   try {
     const projectName = run.project_name || run.domain || `project_${run.project_id}`;
     const projectDir = path.join(process.cwd(), 'temp', 'test', projectName);
-    const srcDir = path.join(projectDir, 'newSrc');
+    const srcDir = path.join(projectDir, 'src');
     
     // Check if package.json exists
     const packageJsonPath = path.join(srcDir, 'package.json');
@@ -2640,12 +2640,12 @@ router.post('/:id/approve-test-cases', async (req, res) => {
     }
     
     // Complete test_approval step
-    await completeStep(id, 'test_approval', 'completed', null, { 
+    await completeStep(id, 'test_approval', STEP_STATUS.COMPLETED, null, { 
       approvedTestCasesCount: finalApprovedTestCases.length 
     });
     
     // Start generate_scripts step
-    await startStep(id, 'generate_scripts', { approvedTestCasesCount: finalApprovedTestCases.length });
+    await startStep(id, STEP_NAMES.GENERATE_EXECUTE_SCRIPTS, { approvedTestCasesCount: finalApprovedTestCases.length });
     
     // Cập nhật approved test cases và chuyển sang state generating_scripts
     await pool.query(`
@@ -2832,15 +2832,15 @@ router.post('/:id/approve-report', async (req, res) => {
       await addLog(id, `Failed to get MR info: ${error.message}`, 'error');
     }
     
-    // Complete report_approval step
-    await completeStep(id, 'report_approval', 'completed', null, { 
+    // Complete coverage_approval step
+    await completeStep(id, STEP_NAMES.COVERAGE_APPROVAL, STEP_STATUS.COMPLETED, null, { 
       reportUrl,
       mrUrl,
-      mrNumber 
+      mrNumber
     });
     
     // Complete completed step
-    await completeStep(id, 'completed', 'completed', null, { 
+    await completeStep(id, STEP_NAMES.COMPLETED, STEP_STATUS.COMPLETED, null, { 
       reportUrl,
       mrUrl,
       mrNumber 
@@ -3044,8 +3044,8 @@ router.post('/:id/reject-report', async (req, res) => {
       WHERE id = $1
     `, [id]);
     
-    // Complete report_approval step as failed
-    await completeStep(id, 'report_approval', 'failed', 'Test report rejected by user');
+    // Complete coverage_approval step as failed
+    await completeStep(id, STEP_NAMES.COVERAGE_APPROVAL, STEP_STATUS.FAILED, 'Test report rejected by user');
     
     // Tạo log
     await addLog(id, `Test report rejected by user`, 'error');
@@ -3063,90 +3063,50 @@ router.post('/:id/reject-report', async (req, res) => {
   }
 });
 
-// Helper function to read test case files
+// Helper function to read test cases from database
 async function readTestCaseFiles(runId, run) {
   try {
-    // Use a more reliable way to get project name
-    let projectName = run.project_name || run.domain || `project_${run.project_id}`;
+    // Read approved test cases from database
+    const result = await pool.query(`
+      SELECT test_case_id, description, input, expected
+      FROM test_cases 
+      WHERE run_id = $1
+      ORDER BY id
+    `, [runId]);
     
-    // If project name contains special characters or is too long, use a safe version
-    projectName = projectName.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 50);
-    
-    const utcDir = path.join(process.cwd(), 'temp', 'test', projectName, 'utc');
-    
-    // Check if directory exists
-    try {
-      await fs.access(utcDir);
-    } catch (error) {
-      // Try alternative directory structure
-      const altUtcDir = path.join(process.cwd(), 'temp', 'test', 'Test', 'utc');
-      try {
-        await fs.access(altUtcDir);
-        logger.info(`Using alternative directory: ${altUtcDir}`);
-        return await readTestCaseFilesFromDir(runId, altUtcDir);
-      } catch (altError) {
-        throw new Error(`Test case directory not found: ${utcDir} or ${altUtcDir}`);
-      }
+    if (result.rows.length === 0) {
+      throw new Error('No test cases found in database for this run');
     }
     
-    return await readTestCaseFilesFromDir(runId, utcDir);
+    // Convert database format to expected format
+    const testCases = result.rows.map(row => ({
+      id: row.test_case_id,
+      title: row.description || 'Test case',
+      description: row.description,
+      input: typeof row.input === 'string' ? JSON.parse(row.input) : row.input,
+      expected: typeof row.expected === 'string' ? JSON.parse(row.expected) : row.expected
+    }));
+    
+    logger.info(`Found ${testCases.length} test cases in database for run ${runId}`);
+    return testCases;
     
   } catch (error) {
-    logger.error('Error reading test case files:', error);
-    await addLog(runId, `Error reading test case files: ${error.message}`, 'error');
+    logger.error('Error reading test cases from database:', error);
+    await addLog(runId, `Error reading test cases from database: ${error.message}`, 'error');
     throw error;
   }
 }
 
-// Helper function to read test case files from a specific directory
-async function readTestCaseFilesFromDir(runId, utsDir) {
-  try {
-    // Read all test case files
-    const files = await fs.readdir(utsDir);
-    const testCaseFiles = files.filter(file => file.endsWith('.json'));
-    
-    const testCases = [];
-    for (const file of testCaseFiles) {
-      const filePath = path.join(utsDir, file);
-      const content = await fs.readFile(filePath, 'utf8');
-      const fileData = JSON.parse(content);
-      
-      // Extract individual test cases from the grouped format
-      if (fileData.testCases && Array.isArray(fileData.testCases)) {
-        for (const testCase of fileData.testCases) {
-          testCases.push({
-            ...testCase,
-            sourceFile: fileData.sourceFile,
-            filePath: fileData.sourceFile
-          });
-        }
-      } else {
-        // Fallback for old format
-        testCases.push({
-          ...fileData,
-          sourceFile: file.replace('.json', ''),
-          filePath: file.replace('.json', '')
-        });
-      }
-    }
-    
-    await addLog(runId, `Read ${testCases.length} test cases from ${testCaseFiles.length} files in ${utsDir}`, 'info');
-    return testCases;
-    
-  } catch (error) {
-    logger.error('Error reading test case files from directory:', error);
-    throw error;
-  }
-}
 
 // Helper function to create test script files from raw code
 async function createTestScriptFilesFromCode(runId, testScriptCode, run) {
   try {
     const projectName = run.project_name || run.domain || `project_${run.project_id}`;
     const testDir = path.join(process.cwd(), 'temp', 'test', projectName);
-    const utsDir = path.join(testDir, 'uts');
+    const srcTestDir = path.join(testDir, 'src', 'test');
     
-    await fs.mkdir(utsDir, { recursive: true });
+    // Create test directory structure
+    await fs.mkdir(srcTestDir, { recursive: true });
     
     // Parse test script code to extract individual test files
     const testFiles = parseTestScriptCode(testScriptCode);
@@ -3154,7 +3114,7 @@ async function createTestScriptFilesFromCode(runId, testScriptCode, run) {
     let totalFiles = 0;
     for (const testFile of testFiles) {
       // Create directory structure
-      const testFilePath = path.join(utsDir, testFile.path);
+      const testFilePath = path.join(srcTestDir, testFile.path);
       const testFileDir = path.dirname(testFilePath);
       await fs.mkdir(testFileDir, { recursive: true });
       
@@ -3163,8 +3123,8 @@ async function createTestScriptFilesFromCode(runId, testScriptCode, run) {
       totalFiles++;
     }
     
-    await addLog(runId, `Created ${totalFiles} test script files in ${utsDir}`, 'info');
-    logger.info(`Created ${totalFiles} test script files for run ${runId} in ${utsDir}`);
+    await addLog(runId, `Created ${totalFiles} test script files in ${srcTestDir}`, 'info');
+    logger.info(`Created ${totalFiles} test script files for run ${runId} in ${srcTestDir}`);
     
   } catch (error) {
     logger.error('Error creating test script file:', error);
@@ -3539,21 +3499,24 @@ async function saveSourceCodeToFiles(runId, codeContent, project) {
 async function clearWorkspace(runId, project) {
   try {
     const projectName = project.name || project.domain || `project_${project.id}`;
+    
+    // Clear workspace directory in server/temp
     const testDir = path.join(process.cwd(), 'temp', 'test', projectName);
     
-    // Check if directory exists
+    // Clear workspace directory (server/temp/test/:projectName)
     try {
       await fs.access(testDir);
+      await fs.rm(testDir, { recursive: true, force: true });
+      await addLog(runId, `Cleared workspace directory: ${testDir}`, 'info');
     } catch (error) {
       // Directory doesn't exist, nothing to clear
       await addLog(runId, `Workspace directory ${testDir} doesn't exist, nothing to clear`, 'info');
-      return;
     }
     
-    // Remove entire test directory
-    await fs.rm(testDir, { recursive: true, force: true });
+    // Ensure the directory is recreated for the new run
+    await fs.mkdir(testDir, { recursive: true });
     
-    await addLog(runId, `Cleared workspace directory: ${testDir}`, 'info');
+    await addLog(runId, `Workspace cleared successfully for project: ${projectName}`, 'info');
     logger.info(`Cleared workspace for run ${runId} at ${testDir}`);
     
   } catch (error) {

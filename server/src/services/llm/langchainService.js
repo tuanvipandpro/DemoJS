@@ -89,13 +89,36 @@ Return ONLY the JSON array, no other text.
         modelType: this.model.constructor.name
       });
 
-                           // Optimized prompt for pure JSON response
-       const message = `You are a software testing expert. Generate comprehensive test cases for the following JavaScript code.
+                           // Optimized prompt for maximum coverage with 3-5 test cases
+       const message = `You are a software testing expert specializing in maximizing code coverage. Generate 3-5 high-quality test cases for the following JavaScript code that achieve >80% coverage.
 
 Code to test:
 \`\`\`javascript
 ${codeContent}
 \`\`\`
+
+COVERAGE OPTIMIZATION STRATEGY:
+- Focus on testing the most critical and complex functions first
+- Ensure each test case covers different code paths and branches
+- Prioritize functions with high cyclomatic complexity
+- Test both positive and negative scenarios
+- Include boundary value testing for numeric inputs
+- Test all conditional branches and error paths
+- Cover all if/else, switch, and ternary conditions
+- Test loop logic and iterations
+- Test async operations if present
+
+TEST FOCUS AREAS (in priority order):
+1. Core business logic and calculations
+2. Input validation and edge cases
+3. Error handling and exception scenarios
+4. Conditional branches and decision points
+5. Loop logic and iterations
+6. Function return values
+7. Data transformation and processing
+8. State changes and side effects
+9. Async operations and promises
+10. Boundary values and null/undefined inputs
 
 IMPORTANT: Return ONLY a valid JSON array. Do NOT wrap the response in markdown code blocks (\`\`\`json or \`\`\`). Return pure JSON only.
 
@@ -109,6 +132,8 @@ Required JSON format:
     "description": "test description"
   }}
 ]
+
+Generate 3-5 test cases that maximize code coverage while focusing on the most critical functionality. Quality over quantity - each test should cover unique code paths.
 
 Return ONLY the JSON array, no other text.`;
 

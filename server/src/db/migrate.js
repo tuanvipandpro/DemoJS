@@ -293,6 +293,8 @@ export async function migrateTestCases() {
         description TEXT NOT NULL,
         input JSONB NOT NULL,
         expected JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(run_id, test_case_id)
       )
     `);

@@ -1,0 +1,6 @@
+---
+description: Không hard code, các function dùng chung thì hãy tạo utils, các biến thì hãy tạo enum.
+globs:
+    - "*.js"
+alwaysApply: true
+---

@@ -127,16 +127,27 @@ Please generate unit test cases in the following JSON format:
   }
 ]
 
-UNIT TEST FOCUS AREAS:
-1. **Function Return Values**: Test what functions return
-2. **Input Validation**: Test with valid, invalid, and edge case inputs
+UNIT TEST FOCUS AREAS (PRIORITIZE FOR MAXIMUM COVERAGE):
+1. **Core Function Logic**: Test main business logic and calculations
+2. **Input Validation**: Test valid, invalid, and edge case inputs
 3. **Error Handling**: Test exception scenarios and error conditions
 4. **Edge Cases**: Test boundary values, null/undefined inputs, empty data
-5. **Business Logic**: Test core logic and calculations
+5. **Function Return Values**: Test what functions return
 6. **Data Transformation**: Test data processing and conversion
 7. **State Changes**: Test how functions modify state or data
+8. **Conditional Branches**: Test all if/else, switch, and ternary conditions
+9. **Loop Logic**: Test for/while loops and iterations
+10. **Async Operations**: Test promises, callbacks, and async/await
 
-Generate 8-12 comprehensive unit test cases that thoroughly test individual functions and methods.`;
+COVERAGE OPTIMIZATION STRATEGY:
+- Focus on testing the most critical and complex functions first
+- Ensure each test case covers different code paths and branches
+- Prioritize functions with high cyclomatic complexity
+- Test both positive and negative scenarios
+- Include boundary value testing for numeric inputs
+- Test all conditional branches and error paths
+
+Generate 3-5 high-quality unit test cases that maximize code coverage (>80%) while focusing on the most critical functionality. Quality over quantity - each test should cover unique code paths.`;
   }
 
   buildTestScriptsPrompt(approvedTestCases, instruction) {

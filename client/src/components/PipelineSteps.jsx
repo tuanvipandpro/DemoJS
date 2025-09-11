@@ -39,9 +39,12 @@ import {
   HourglassEmpty as PendingIcon,
   ExpandMore as ExpandMoreIcon,
   CheckCircle,
-  Error
+  Error,
+  CleaningServices as CleanWorkspaceIcon,
+  Merge as CreateMRIcon
 } from '@mui/icons-material';
 import { runsService } from '../services/runs';
+import { ALL_STEPS, STATE_TO_STEP_MAP, STEP_NAMES } from '../constants/pipelineSteps';
 
 const PipelineSteps = ({ currentState, progress = 0, errorMessage = null, isFailed = false, run = null, onRunUpdate = null }) => {
   const [testCases, setTestCases] = useState([]);
@@ -152,68 +155,21 @@ const PipelineSteps = ({ currentState, progress = 0, errorMessage = null, isFail
 
 
 
-  const steps = [
-    {
-      id: 'queued',
-      label: 'Queued',
-      description: 'Test run is queued and waiting to start',
-      icon: <CompletedIcon />
-    },
-    {
-      id: 'pull_code_generate_test',
-      label: 'Pull Code & Generate Tests',
-      description: 'Downloading source code and generating test cases with AI',
-      icon: <GenerateTestsIcon />
-    },
-    {
-      id: 'test_approval',
-      label: 'Test Approval',
-      description: 'Waiting for user approval of test cases',
-      icon: <TestApprovalIcon />
-    },
-    {
-      id: 'generate_scripts',
-      label: 'Generate Scripts',
-      description: 'Creating executable test scripts',
-      icon: <GenerateScriptsIcon />
-    },
-    {
-      id: 'create_mr',
-      label: 'Create MR',
-      description: 'Creating merge request with test scripts',
-      icon: <GenerateScriptsIcon />
-    },
-    {
-      id: 'pull_new_branch',
-      label: 'Pull New Branch',
-      description: 'Pulling code from the new branch with test scripts',
-      icon: <PullCodeIcon />
-    },
-    {
-      id: 'run_test',
-      label: 'Run Tests',
-      description: 'Executing tests and checking coverage',
-      icon: <RunTestsIcon />
-    },
-    {
-      id: 'generate_report',
-      label: 'Generate Report',
-      description: 'Creating comprehensive test report',
-      icon: <GenerateReportIcon />
-    },
-    {
-      id: 'report_approval',
-      label: 'Report Approval',
-      description: 'Waiting for user approval of test report',
-      icon: <ReportApprovalIcon />
-    },
-    {
-      id: 'completed',
-      label: 'Completed',
-      description: 'Test run completed successfully',
-      icon: <CompletedIcon />
-    }
-  ];
+  // Add icons to steps
+  const steps = ALL_STEPS.map(step => ({
+    ...step,
+    icon: (() => {
+      const iconMap = {
+        [STEP_NAMES.CLEAN_WORKSPACE]: <CleanWorkspaceIcon />,
+        [STEP_NAMES.PULL_CODE_GENERATE_TESTS]: <GenerateTestsIcon />,
+        [STEP_NAMES.GENERATE_EXECUTE_SCRIPTS]: <GenerateScriptsIcon />,
+        [STEP_NAMES.REPORT_APPROVAL]: <ReportApprovalIcon />,
+        [STEP_NAMES.CREATE_MR]: <CreateMRIcon />,
+        [STEP_NAMES.COMPLETED]: <CompletedIcon />
+      };
+      return iconMap[step.id] || <CompletedIcon />;
+    })()
+  }));
 
   const getStepStatus = (stepId) => {
     // First check if we have step history data
@@ -411,19 +367,8 @@ const PipelineSteps = ({ currentState, progress = 0, errorMessage = null, isFail
     return steps.findIndex(step => step.id === currentState);
   };
 
-  // Map current state to step
-  const stateToStepMap = {
-    'queued': 'queued',
-    'pulling_code': 'pull_code_generate_test',
-    'generating_tests': 'pull_code_generate_test',
-    'test_approval': 'test_approval',
-    'generating_scripts': 'generate_scripts',
-    'running_tests': 'run_test',
-    'generating_report': 'generate_report',
-    'report_approval': 'report_approval',
-    'completed': 'completed',
-    'failed': 'failed'
-  };
+  // Map current state to step using constants
+  const stateToStepMap = STATE_TO_STEP_MAP;
 
   // Get steps to display based on current state
   const getStepsToDisplay = () => {
