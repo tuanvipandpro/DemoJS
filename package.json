@@ -21,15 +21,5 @@
     "nodemon": "^3.0.1",
     "jest": "^29.7.0",
     "supertest": "^6.3.3"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "collectCoverageFrom": [
-      "services/**/*.js",
-      "server.js",
-      "!node_modules/**"
-    ],
-    "coverageDirectory": "coverage",
-    "coverageReporters": ["text", "lcov", "html"]
   }
 }
