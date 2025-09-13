@@ -61,9 +61,16 @@ app.use('*', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server đang chạy tại http://localhost:${PORT}`);
-  console.log('Các API có sẵn:');
-  console.log('- Math APIs: /api/math/*');
-  console.log('- String APIs: /api/string/*');
-});
+// Export app for testing
+module.exports = app;
+
+// Only start server if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`Server đang chạy tại http://localhost:${PORT}`);
+    console.log('Các API có sẵn:');
+    console.log('- Math APIs: /api/math/*');
+    console.log('- String APIs: /api/string/*');
+  });
+}
+
