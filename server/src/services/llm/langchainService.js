@@ -164,36 +164,114 @@ Return ONLY the JSON array, no other text.`;
     }
   }
 
-  async generateTestScripts(approvedTestCases, instruction) {
+  async generateTestScripts(approvedTestCases, instruction, projectStructure = null) {
     if (!this.model) {
       throw new Error('LangChain service not configured');
     }
 
     try {
+      let projectInfo = '';
+      if (projectStructure) {
+        projectInfo = `
+
+PROJECT STRUCTURE:
+\`\`\`json
+{projectStructure}
+\`\`\`
+
+        IMPORTANT: Use the correct import paths based on the project structure above. The test files are in the 'test/' directory and need to import from the correct relative paths to the source files.
+
+        SAMPLE TEST CASES FOR REFERENCE:
+        \`\`\`javascript
+        // Math API Test Example
+        it('should add two numbers correctly', async () => {
+          const res = await request(app)
+            .post('/api/math/add')
+            .send({{ a: 5, b: 3 }});
+          expect(res.statusCode).toBe(200);
+          expect(res.body).toEqual({{ 
+            operation: "addition", 
+            operands: {{ a: 5, b: 3 }}, 
+            result: 8 
+          }});
+        });
+
+        // String API Test Example
+        it('should reverse a string correctly', async () => {
+          const res = await request(app)
+            .post('/api/string/reverse')
+            .send({{ text: "hello" }});
+          expect(res.statusCode).toBe(200);
+          expect(res.body).toEqual({{ 
+            operation: "reverse", 
+            input: "hello", 
+            result: "olleh" 
+          }});
+        });
+        \`\`\`
+        `;
+        }
+
       const prompt = PromptTemplate.fromTemplate(`
 You are an expert software testing engineer. Generate unit test scripts for the following approved test cases.
 
 APPROVED TEST CASES:
 \`\`\`json
 {approvedTestCases}
-\`\`\`
+\`\`\`${projectInfo}
 
 TESTING REQUIREMENTS:
 - Language: {testingLanguage}
 - Framework: {testingFramework}
 
-IMPORTANT: Return ONLY the raw test code content. Do NOT wrap in markdown code blocks (\`\`\`js or \`\`\`). Return pure code only.
+CRITICAL REQUIREMENTS:
+1. Return ONLY the raw test code content. Do NOT wrap in markdown code blocks (\`\`\`js or \`\`\`). Return pure code only.
+2. Use correct import paths based on the project structure above
+3. For Express app testing: import app from '../server' (not '../../app')
+4. For service testing: import service functions correctly based on project structure
+5. Use proper {testingFramework} syntax and assertions
+6. Handle async operations properly with async/await
+7. Include proper error handling and edge cases
+8. Write clear, descriptive test names that match the test case descriptions
+9. Use realistic test data that matches the expected behavior
+10. Ensure all tests are independent and can run in any order
 
-Requirements:
-1. Use proper {testingFramework} syntax
-2. Include necessary imports and setup
-3. Write clear, descriptive test names
-4. Include proper assertions
-5. Handle async operations if needed
-6. Include test data setup and teardown
-7. Follow best practices for {testingLanguage} testing
+API TESTING GUIDELINES:
+- For API endpoint tests, use the correct URL patterns:
+  * Math APIs: /api/math/{{operation}} (add, subtract, multiply, divide)
+  * String APIs: /api/string/{{operation}} (reverse, word-count, palindrome, capitalize, char-count)
+- Use correct request parameter names:
+  * Math operations: {{ a: number, b: number }}
+  * String operations: {{ text: string }}
+- Expect correct response formats:
+  * Math: {{ operation: string, operands: {{a: number, b: number}}, result: number }}
+  * String: {{ operation: string, input: string, result: object/string }}
+- For error cases, expect 400 status with proper error messages
+- Use supertest for API testing: const request = require('supertest'); const app = require('../server');
 
-Generate complete, runnable test code. Return ONLY the raw code, no other text.
+RESPONSE FORMAT EXAMPLES:
+- Math addition: {{ operation: "addition", operands: {{a: 5, b: 3}}, result: 8 }}
+- String reverse: {{ operation: "reverse", input: "hello", result: "olleh" }}
+- String palindrome: {{ operation: "palindrome", input: "racecar", result: {{ isPalindrome: true, cleanedText: "racecar", reversedText: "racecar" }} }}
+- String word count: {{ operation: "word-count", input: "hello world", result: {{ wordCount: 2, words: ["hello", "world"] }} }}
+- Error response: {{ error: "Lỗi chia cho 0", message: "Không thể chia cho 0" }}
+
+TEST CASE COMPLEXITY GUIDELINES:
+- Use simple, clear test cases that are easy to understand and maintain
+- Avoid overly complex inputs that may cause parsing issues
+- For palindrome tests, use simple words like "racecar" instead of complex sentences
+- For math tests, use small, round numbers for easier verification
+- Focus on testing the core functionality, not edge cases in initial tests
+
+TEST STRUCTURE GUIDELINES:
+- Use describe() blocks to group related tests
+- Use it() or test() for individual test cases
+- Use expect() for assertions
+- Use async/await for asynchronous operations
+- Mock external dependencies if needed
+- Clean up after each test if necessary
+
+Generate complete, runnable test code that will pass immediately without modification. Return ONLY the raw code, no other text.
       `);
 
       const outputParser = new StringOutputParser();
@@ -207,7 +285,8 @@ Generate complete, runnable test code. Return ONLY the raw code, no other text.
       const result = await chain.invoke({
         approvedTestCases: JSON.stringify(approvedTestCases, null, 2),
         testingLanguage: instruction.testingLanguage || 'javascript',
-        testingFramework: instruction.testingFramework || 'jest'
+        testingFramework: instruction.testingFramework || 'jest',
+        projectStructure: projectStructure ? JSON.stringify(projectStructure, null, 2) : ''
       });
 
       // Handle LangChain response - result should be a string from StringOutputParser

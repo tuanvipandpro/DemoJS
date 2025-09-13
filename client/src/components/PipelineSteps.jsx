@@ -146,6 +146,13 @@ const PipelineSteps = ({ currentState, progress = 0, errorMessage = null, isFail
     }
   }, [currentState, run?.id, testCases.length, fetchTestCases]);
 
+  // Auto expand test_approval step when current state is test_approval
+  useEffect(() => {
+    if (currentState === 'test_approval') {
+      setExpandedSteps(prev => new Set([...prev, 'test_approval']));
+    }
+  }, [currentState]);
+
   // Fetch step history when run changes
   useEffect(() => {
     if (run?.id) {
